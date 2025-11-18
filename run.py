@@ -5,20 +5,18 @@ Run this script to start the parking detection system
 """
 
 import argparse
-import sys
-import os
 import logging
-from enhanced_parking_detector import EnhancedParkingDetector
+import os
+import sys
+
 import config
+from enhanced_parking_detector import EnhancedParkingDetector
 
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('parking_detection.log')
-    ]
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler("parking_detection.log")],
 )
 logger = logging.getLogger(__name__)
 
@@ -66,18 +64,18 @@ def main():
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description='Advanced Car Parking Space Detection System',
+        description="Advanced Car Parking Space Detection System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Process an image
-  python run.py --image carParkImg.png
+  python run.py --image carParkImg.jpg
 
   # Process a video
   python run.py --video carPark.mp4
 
   # Process both (image for setup, video for detection)
-  python run.py --image carParkImg.png --video carPark.mp4
+  python run.py --image carParkImg.jpg --video carPark.mp4
 
 Keyboard Shortcuts (during execution):
   D - Detect vehicles and generate reports
@@ -87,42 +85,33 @@ Keyboard Shortcuts (during execution):
   Q - Quit application
 
 For more information, visit: https://github.com/8harath/Car-Parking-Detection
-        """
+        """,
     )
 
     parser.add_argument(
-        '--image', '-i',
+        "--image",
+        "-i",
         type=str,
-        help='Path to parking lot image for space selection',
-        default=config.DEFAULT_IMAGE_PATH
+        help="Path to parking lot image for space selection",
+        default=config.DEFAULT_IMAGE_PATH,
     )
 
     parser.add_argument(
-        '--video', '-v',
+        "--video", "-v", type=str, help="Path to parking lot video for detection", default=None
+    )
+
+    parser.add_argument(
+        "--mode",
+        "-m",
         type=str,
-        help='Path to parking lot video for detection',
-        default=None
+        choices=["image", "video", "both"],
+        default="image",
+        help="Processing mode: image, video, or both",
     )
 
-    parser.add_argument(
-        '--mode', '-m',
-        type=str,
-        choices=['image', 'video', 'both'],
-        default='image',
-        help='Processing mode: image, video, or both'
-    )
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 
-    parser.add_argument(
-        '--verbose',
-        action='store_true',
-        help='Enable verbose logging'
-    )
-
-    parser.add_argument(
-        '--version',
-        action='version',
-        version='Car Parking Detection System v2.0'
-    )
+    parser.add_argument("--version", action="version", version="Car Parking Detection System v2.0")
 
     args = parser.parse_args()
 
@@ -137,21 +126,21 @@ For more information, visit: https://github.com/8harath/Car-Parking-Detection
 
     # Determine mode
     if args.video and not args.image:
-        mode = 'video'
+        mode = "video"
     elif args.image and not args.video:
-        mode = 'image'
+        mode = "image"
     elif args.image and args.video:
-        mode = 'both'
+        mode = "both"
     else:
         mode = args.mode
 
     # Validate files based on mode
-    if mode in ['image', 'both']:
+    if mode in ["image", "both"]:
         if not validate_file(args.image, "image"):
             sys.exit(1)
         print(f"✓ Image file found: {args.image}")
 
-    if mode in ['video', 'both']:
+    if mode in ["video", "both"]:
         if not args.video:
             logger.error("Video mode requires --video argument")
             print("❌ Error: Video mode requires a video file path")
@@ -167,29 +156,29 @@ For more information, visit: https://github.com/8harath/Car-Parking-Detection
         print("\n⚙️  Initializing detector...")
 
         detector = EnhancedParkingDetector(
-            image_path=args.image if mode in ['image', 'both'] else None,
-            video_path=args.video if mode in ['video', 'both'] else None
+            image_path=args.image if mode in ["image", "both"] else None,
+            video_path=args.video if mode in ["video", "both"] else None,
         )
 
         print("✓ Detector initialized successfully")
 
         # Process based on mode
-        if mode == 'image' or mode == 'both':
+        if mode == "image" or mode == "both":
             logger.info(f"Processing image: {args.image}")
             print(f"\n📸 Processing image: {args.image}")
-            print("\n" + "="*60)
+            print("\n" + "=" * 60)
             print("KEYBOARD SHORTCUTS:")
-            print("="*60)
+            print("=" * 60)
             print("  D - Detect vehicles & generate reports")
             print("  S - Save parking layout")
             print("  R - Reset all selections")
             print("  Z - Undo last selection")
             print("  Q - Quit application")
-            print("="*60 + "\n")
+            print("=" * 60 + "\n")
 
             detector.process_image()
 
-        if mode == 'video':
+        if mode == "video":
             logger.info(f"Processing video: {args.video}")
             print(f"\n🎥 Processing video: {args.video}")
             print("\nPress 'Q' to quit\n")

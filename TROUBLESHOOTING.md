@@ -66,23 +66,23 @@ pip install -r requirements.txt
 
 **Symptoms:**
 ```
-❌ Error: Image not found at 'carParkImg.png'
+❌ Error: Image not found at 'carParkImg.jpg'
 ```
 
 **Solutions:**
 1. Check file path is correct:
 ```bash
-ls -la carParkImg.png
+ls -la carParkImg.jpg
 ```
 
 2. Use absolute path:
 ```bash
-python run.py --image /full/path/to/carParkImg.png
+python run.py --image /full/path/to/carParkImg.jpg
 ```
 
 3. Verify file permissions:
 ```bash
-chmod 644 carParkImg.png
+chmod 644 carParkImg.jpg
 ```
 
 ### Problem: "Failed to load YOLO model"
@@ -96,7 +96,7 @@ IOError: Failed to load YOLO model from yolov8n.pt
 1. Delete existing model and re-download:
 ```bash
 rm yolov8n.pt
-python run.py --image carParkImg.png
+python run.py --image carParkImg.jpg
 # Model will auto-download
 ```
 
@@ -185,7 +185,7 @@ MemoryError: Unable to allocate array
 1. **Use CPU instead of GPU:**
 ```bash
 export CUDA_VISIBLE_DEVICES=""
-python run.py --image carParkImg.png
+python run.py --image carParkImg.jpg
 ```
 
 2. **Reduce batch size:**
@@ -199,7 +199,7 @@ results = self.model(image, conf=self.confidence_threshold, batch=1)
 4. **Restart Python:**
 ```bash
 # Clear memory and restart
-python run.py --image carParkImg.png
+python run.py --image carParkImg.jpg
 ```
 
 ---
@@ -338,7 +338,7 @@ rm -f *.pyc
 2. **Restart application:**
 ```bash
 # Exit completely and restart
-python run.py --image carParkImg.png
+python run.py --image carParkImg.jpg
 ```
 
 3. **Verify config syntax:**
@@ -357,10 +357,10 @@ python -m py_compile config.py
 **Solution:**
 ```cmd
 # Use py instead of python
-py run.py --image carParkImg.png
+py run.py --image carParkImg.jpg
 
 # Or use python3
-python3 run.py --image carParkImg.png
+python3 run.py --image carParkImg.jpg
 ```
 
 #### Problem: Path Issues with Backslashes
@@ -380,7 +380,7 @@ image_path = r"C:\path\to\image.png"
 **Solution:**
 ```bash
 # Use python3
-python3 run.py --image carParkImg.png
+python3 run.py --image carParkImg.jpg
 
 # Or create alias
 alias python=python3
@@ -395,7 +395,7 @@ pip install PyQt5
 
 # Or use different backend
 export MPLBACKEND=TkAgg
-python run.py --image carParkImg.png
+python run.py --image carParkImg.jpg
 ```
 
 ### Linux
@@ -424,7 +424,7 @@ sudo apt-get install libxcb-xinerama0
 
 # Or use headless mode
 export QT_QPA_PLATFORM=offscreen
-python run.py --image carParkImg.png
+python run.py --image carParkImg.jpg
 ```
 
 ---
@@ -440,7 +440,7 @@ If you still have issues after trying these solutions:
 cat parking_detection.log
 
 # View Python error details
-python run.py --verbose --image carParkImg.png
+python run.py --verbose --image carParkImg.jpg
 ```
 
 ### 2. Gather Information

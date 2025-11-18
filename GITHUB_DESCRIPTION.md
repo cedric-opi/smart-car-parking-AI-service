@@ -76,7 +76,7 @@ An intelligent, production-ready parking space detection system that combines cl
 
 🚀 Quick Start
 pip install -r requirements.txt
-python run.py --image carParkImg.png
+python run.py --image carParkImg.jpg
 
 Built by Bharath K (Jain Deemed to be University) for IIT Tirupati Navishkar PNT Lab selection.
 ```

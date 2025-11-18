@@ -232,7 +232,7 @@ cd Car-Parking-Detection
 pip install -r requirements.txt
 
 # 3. Run the application
-python run.py --image carParkImg.png
+python run.py --image carParkImg.jpg
 ```
 
 ### First Run
@@ -281,7 +281,7 @@ pip install -r requirements.txt
 
 ```bash
 # Start the program
-python run.py --image carParkImg.png
+python run.py --image carParkImg.jpg
 ```
 
 **What you'll see:** A window will open showing a parking lot image.
@@ -469,7 +469,7 @@ python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
 #### Process an Image
 
 ```bash
-python run.py --image carParkImg.png
+python run.py --image carParkImg.jpg
 ```
 
 #### Process a Video
@@ -556,7 +556,7 @@ Car-Parking-Detection/
 ├── TROUBLESHOOTING.md            # Common issues and solutions
 ├── LICENSE                        # MIT License
 ├── .gitignore                    # Git ignore rules
-├── carParkImg.png                # Sample parking lot image
+├── carParkImg.jpg                # Sample parking lot image
 ├── carPark.mp4                   # Sample parking lot video
 ├── CarParkPos                    # Saved parking positions
 ├── reports/                      # Generated reports
