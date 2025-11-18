@@ -1,21 +1,21 @@
 """
 Setup script to create necessary directory structure for the application
 """
-import os
-import config
+
 import logging
+import os
+from typing import List, Tuple
+
+import config
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-def setup_directories():
+
+def setup_directories() -> Tuple[bool, List[str]]:
     """Create all necessary directories for the application"""
-    directories = [
-        config.REPORTS_DIR,
-        config.DATA_DIR,
-        config.MODELS_DIR
-    ]
+    directories = [config.REPORTS_DIR, config.DATA_DIR, config.MODELS_DIR]
 
     logger.info("Setting up directory structure...")
 
@@ -32,6 +32,9 @@ def setup_directories():
     print(f"  - Reports will be saved to: {config.REPORTS_DIR}")
     print(f"  - Data files will be saved to: {config.DATA_DIR}")
     print(f"  - Models will be stored in: {config.MODELS_DIR}")
+
+    return True, []
+
 
 if __name__ == "__main__":
     setup_directories()

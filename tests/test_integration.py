@@ -1,14 +1,16 @@
 """Integration tests for the parking detection system"""
-import pytest
-import sys
+
 import os
+import sys
+
 import cv2
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from enhanced_parking_detector import EnhancedParkingDetector
 import config
+from enhanced_parking_detector import EnhancedParkingDetector
 
 
 class TestIntegration:
@@ -17,8 +19,8 @@ class TestIntegration:
     def test_config_import(self):
         """Test that config module imports correctly"""
         assert config is not None
-        assert hasattr(config, 'PARKING_WIDTH')
-        assert hasattr(config, 'PARKING_HEIGHT')
+        assert hasattr(config, "PARKING_WIDTH")
+        assert hasattr(config, "PARKING_HEIGHT")
 
     def test_detector_creation(self):
         """Test detector can be created"""
@@ -40,8 +42,7 @@ class TestIntegration:
         # Check if sample image exists
         if os.path.exists(config.DEFAULT_IMAGE_PATH):
             detector = EnhancedParkingDetector(
-                image_path=config.DEFAULT_IMAGE_PATH,
-                video_path=None
+                image_path=config.DEFAULT_IMAGE_PATH, video_path=None
             )
 
             assert detector.current_image is not None

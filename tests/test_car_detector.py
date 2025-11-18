@@ -1,14 +1,16 @@
 """Tests for car detection module"""
-import pytest
-import sys
+
 import os
+import sys
+
 import numpy as np
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from car_detector import CarDetector
 import config
+from car_detector import CarDetector
 
 
 class TestCarDetector:
@@ -45,10 +47,10 @@ class TestCarDetector:
 
         if len(detections) > 0:
             detection = detections[0]
-            assert 'class_name' in detection
-            assert 'confidence' in detection
-            assert 'bbox' in detection
-            assert len(detection['bbox']) == 4
+            assert "class_name" in detection
+            assert "confidence" in detection
+            assert "bbox" in detection
+            assert len(detection["bbox"]) == 4
 
     def test_confidence_threshold(self, detector, sample_image):
         """Test confidence threshold filtering"""
@@ -56,11 +58,11 @@ class TestCarDetector:
 
         # All detections should meet confidence threshold
         for detection in detections:
-            assert detection['confidence'] >= 0.9
+            assert detection["confidence"] >= 0.9
 
     def test_car_classes(self, detector):
         """Test car classes are configured"""
-        assert hasattr(detector, 'car_classes')
+        assert hasattr(detector, "car_classes")
         assert len(detector.car_classes) > 0
 
     def test_invalid_image(self, detector):

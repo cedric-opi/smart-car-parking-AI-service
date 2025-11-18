@@ -1,15 +1,17 @@
 """Tests for parking detection module"""
-import pytest
-import sys
+
 import os
+import sys
+
 import cv2
 import numpy as np
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from enhanced_parking_detector import EnhancedParkingDetector
 import config
+from enhanced_parking_detector import EnhancedParkingDetector
 
 
 class TestEnhancedParkingDetector:
@@ -105,10 +107,7 @@ class TestEnhancedParkingDetector:
     def test_invalid_image_path(self):
         """Test handling of invalid image path"""
         with pytest.raises((FileNotFoundError, cv2.error)):
-            detector = EnhancedParkingDetector(
-                image_path="nonexistent_file.jpg",
-                video_path=None
-            )
+            detector = EnhancedParkingDetector(image_path="nonexistent_file.jpg", video_path=None)
 
     def test_zoom_functionality(self, detector):
         """Test zoom tracking"""

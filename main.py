@@ -1,13 +1,16 @@
-import cv2
-import pickle
-import cvzone
-import numpy as np
-import config
 import logging
 import os
+import pickle
+from typing import List, Tuple
+
+import cv2
+import cvzone
+import numpy as np
+
+import config
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Video feed
@@ -24,7 +27,7 @@ except Exception as e:
 
 # Load parking positions
 try:
-    with open(config.POSITION_FILE, 'rb') as f:
+    with open(config.POSITION_FILE, "rb") as f:
         posList = pickle.load(f)
     logger.info(f"Loaded {len(posList)} parking positions")
 except FileNotFoundError:
@@ -37,14 +40,14 @@ except Exception as e:
 width, height = config.PARKING_WIDTH, config.PARKING_HEIGHT
 
 
-def checkParkingSpace(imgPro):
+def checkParkingSpace(imgPro: np.ndarray) -> None:
     """Check each parking space and count available slots"""
     spaceCounter = 0
 
     for pos in posList:
         x, y = pos
 
-        imgCrop = imgPro[y:y + height, x:x + width]
+        imgCrop = imgPro[y : y + height, x : x + width]
         # cv2.imshow(str(x * y), imgCrop)
         count = cv2.countNonZero(imgCrop)
 
@@ -57,11 +60,20 @@ def checkParkingSpace(imgPro):
             thickness = 2
 
         cv2.rectangle(img, pos, (pos[0] + width, pos[1] + height), color, thickness)
-        cvzone.putTextRect(img, str(count), (x, y + height - 3), scale=1,
-                           thickness=2, offset=0, colorR=color)
+        cvzone.putTextRect(
+            img, str(count), (x, y + height - 3), scale=1, thickness=2, offset=0, colorR=color
+        )
 
-    cvzone.putTextRect(img, f'Free: {spaceCounter}/{len(posList)}', (100, 50), scale=3,
-                           thickness=5, offset=20, colorR=(0,200,0))
+    cvzone.putTextRect(
+        img,
+        f"Free: {spaceCounter}/{len(posList)}",
+        (100, 50),
+        scale=3,
+        thickness=5,
+        offset=20,
+        colorR=(0, 200, 0),
+    )
+
 
 try:
     while True:
@@ -74,8 +86,9 @@ try:
 
         imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         imgBlur = cv2.GaussianBlur(imgGray, (3, 3), 1)
-        imgThreshold = cv2.adaptiveThreshold(imgBlur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                             cv2.THRESH_BINARY_INV, 25, 16)
+        imgThreshold = cv2.adaptiveThreshold(
+            imgBlur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 25, 16
+        )
         imgMedian = cv2.medianBlur(imgThreshold, 5)
         kernel = np.ones((3, 3), np.uint8)
         imgDilate = cv2.dilate(imgMedian, kernel, iterations=1)
@@ -85,7 +98,7 @@ try:
         # cv2.imshow("ImageBlur", imgBlur)
         # cv2.imshow("ImageThres", imgMedian)
 
-        if cv2.waitKey(10) & 0xFF == ord('q'):
+        if cv2.waitKey(10) & 0xFF == ord("q"):
             break
 finally:
     cap.release()

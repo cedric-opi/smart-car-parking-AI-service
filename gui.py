@@ -1,16 +1,33 @@
 import sys
+
 import cv2
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QHBoxLayout, QPushButton, QLabel, QComboBox, 
-                            QSpinBox, QDoubleSpinBox, QTabWidget, QGroupBox,
-                            QGridLayout, QFileDialog, QMessageBox, QSlider)
-from PyQt5.QtCore import Qt, QTimer, QPoint
-from PyQt5.QtGui import QImage, QPixmap, QMouseEvent
-import numpy as np
-from enhanced_parking_detector import EnhancedParkingDetector
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from PyQt5.QtCore import QPoint, Qt, QTimer
+from PyQt5.QtGui import QImage, QMouseEvent, QPixmap
+from PyQt5.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from enhanced_parking_detector import EnhancedParkingDetector
+
 
 class ImageLabel(QLabel):
     def __init__(self, parent=None):
@@ -34,11 +51,14 @@ class ImageLabel(QLabel):
                 # Convert coordinates to image space
                 x = int(x / self.width() * self.parent.detector.current_image.shape[1])
                 y = int(y / self.height() * self.parent.detector.current_image.shape[0])
-                
+
                 # Remove spaces in the clicked area
                 for pos in self.parent.detector.posList[:]:
                     x1, y1 = pos
-                    if x1 < x < x1 + self.parent.detector.width and y1 < y < y1 + self.parent.detector.height:
+                    if (
+                        x1 < x < x1 + self.parent.detector.width
+                        and y1 < y < y1 + self.parent.detector.height
+                    ):
                         self.parent.detector.posList.remove(pos)
                 self.parent.detector.save_parking_positions()
                 self.parent.update_frame()
@@ -53,26 +73,41 @@ class ImageLabel(QLabel):
             self.drawing = False
             if self.parent.detector:
                 # Convert coordinates to image space
-                x1 = int(self.start_point.x() / self.width() * self.parent.detector.current_image.shape[1])
-                y1 = int(self.start_point.y() / self.height() * self.parent.detector.current_image.shape[0])
-                x2 = int(self.end_point.x() / self.width() * self.parent.detector.current_image.shape[1])
-                y2 = int(self.end_point.y() / self.height() * self.parent.detector.current_image.shape[0])
-                
+                x1 = int(
+                    self.start_point.x()
+                    / self.width()
+                    * self.parent.detector.current_image.shape[1]
+                )
+                y1 = int(
+                    self.start_point.y()
+                    / self.height()
+                    * self.parent.detector.current_image.shape[0]
+                )
+                x2 = int(
+                    self.end_point.x() / self.width() * self.parent.detector.current_image.shape[1]
+                )
+                y2 = int(
+                    self.end_point.y() / self.height() * self.parent.detector.current_image.shape[0]
+                )
+
                 # Calculate grid of parking spaces
                 x1, x2 = min(x1, x2), max(x1, x2)
                 y1, y2 = min(y1, y2), max(y1, y2)
-                
+
                 # Calculate number of spaces that fit
                 num_spaces_x = (x2 - x1) // self.parent.detector.width
                 num_spaces_y = (y2 - y1) // self.parent.detector.height
-                
+
                 # Add all spaces in the grid
                 for i in range(num_spaces_x):
                     for j in range(num_spaces_y):
-                        pos = (x1 + i * self.parent.detector.width, y1 + j * self.parent.detector.height)
+                        pos = (
+                            x1 + i * self.parent.detector.width,
+                            y1 + j * self.parent.detector.height,
+                        )
                         if pos not in self.parent.detector.posList:
                             self.parent.detector.posList.append(pos)
-                
+
                 self.parent.detector.save_parking_positions()
                 self.parent.update_frame()
 
@@ -85,6 +120,7 @@ class ImageLabel(QLabel):
             else:
                 self.parent.zoom_out()
 
+
 class ParkingDetectionGUI(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -96,7 +132,7 @@ class ParkingDetectionGUI(QMainWindow):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle('Parking Space Detection System')
+        self.setWindowTitle("Parking Space Detection System")
         self.setGeometry(100, 100, 1200, 800)
 
         # Create main widget and layout
@@ -260,7 +296,7 @@ class ParkingDetectionGUI(QMainWindow):
             "D: Detect & generate report",
             "S: Save current layout",
             "Space: Start/Stop detection",
-            "Esc: Quit application"
+            "Esc: Quit application",
         ]
 
         for shortcut in shortcuts:
@@ -270,16 +306,18 @@ class ParkingDetectionGUI(QMainWindow):
         layout.addWidget(group)
 
     def load_video(self):
-        file_name, _ = QFileDialog.getOpenFileName(self, "Open Video File", "", 
-                                                 "Video Files (*.mp4 *.avi *.mov)")
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, "Open Video File", "", "Video Files (*.mp4 *.avi *.mov)"
+        )
         if file_name:
             self.video_path = file_name
             self.detector = EnhancedParkingDetector(video_path=file_name)
             self.timer.start(30)  # 30ms = ~33fps
 
     def load_image(self):
-        file_name, _ = QFileDialog.getOpenFileName(self, "Open Image File", "", 
-                                                 "Image Files (*.png *.jpg *.jpeg)")
+        file_name, _ = QFileDialog.getOpenFileName(
+            self, "Open Image File", "", "Image Files (*.png *.jpg *.jpeg)"
+        )
         if file_name:
             self.image_path = file_name
             self.detector = EnhancedParkingDetector(image_path=file_name)
@@ -347,7 +385,11 @@ class ParkingDetectionGUI(QMainWindow):
                 ret, frame = self.detector.cap.read()
 
         elif self.image_path:
-            frame = self.detector.current_image.copy() if self.detector.current_image is not None else cv2.imread(self.image_path)
+            frame = (
+                self.detector.current_image.copy()
+                if self.detector.current_image is not None
+                else cv2.imread(self.image_path)
+            )
         else:
             return
 
@@ -357,21 +399,25 @@ class ParkingDetectionGUI(QMainWindow):
 
         # Draw selection rectangle if drawing
         if self.video_label.drawing and self.video_label.start_point and self.video_label.end_point:
-            cv2.rectangle(frame, 
-                        (self.video_label.start_point.x(), self.video_label.start_point.y()),
-                        (self.video_label.end_point.x(), self.video_label.end_point.y()),
-                        (0, 255, 0), 2)
+            cv2.rectangle(
+                frame,
+                (self.video_label.start_point.x(), self.video_label.start_point.y()),
+                (self.video_label.end_point.x(), self.video_label.end_point.y()),
+                (0, 255, 0),
+                2,
+            )
 
         # Convert frame to QImage
         rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_image.shape
         bytes_per_line = ch * w
         qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
-        
+
         # Apply zoom
         scaled_size = qt_image.size() * self.zoom_scale
         scaled_pixmap = QPixmap.fromImage(qt_image).scaled(
-            scaled_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            scaled_size, Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
         self.video_label.setPixmap(scaled_pixmap)
 
     def update_statistics(self):
@@ -389,29 +435,29 @@ class ParkingDetectionGUI(QMainWindow):
 
         # Plot 1: Parking Space Distribution
         total_spaces = len(self.detector.posList)
-        if hasattr(self.detector, 'last_available_slots'):
+        if hasattr(self.detector, "last_available_slots"):
             available = self.detector.last_available_slots
             occupied = total_spaces - available
-            ax1.bar(['Available', 'Occupied'], [available, occupied])
-            ax1.set_title('Parking Space Distribution')
+            ax1.bar(["Available", "Occupied"], [available, occupied])
+            ax1.set_title("Parking Space Distribution")
 
         # Plot 2: Vehicle Types (if available)
-        if hasattr(self.detector, 'last_vehicle_types'):
+        if hasattr(self.detector, "last_vehicle_types"):
             vehicle_types = self.detector.last_vehicle_types
-            ax2.pie(vehicle_types.values(), labels=vehicle_types.keys(), autopct='%1.1f%%')
-            ax2.set_title('Vehicle Type Distribution')
+            ax2.pie(vehicle_types.values(), labels=vehicle_types.keys(), autopct="%1.1f%%")
+            ax2.set_title("Vehicle Type Distribution")
 
         # Plot 3: Detection Confidence (if available)
-        if hasattr(self.detector, 'last_confidences'):
+        if hasattr(self.detector, "last_confidences"):
             confidences = self.detector.last_confidences
             ax3.hist(confidences, bins=10)
-            ax3.set_title('Detection Confidence Distribution')
+            ax3.set_title("Detection Confidence Distribution")
 
         # Plot 4: Time Series (if available)
-        if hasattr(self.detector, 'occupancy_history'):
+        if hasattr(self.detector, "occupancy_history"):
             history = self.detector.occupancy_history
             ax4.plot(history)
-            ax4.set_title('Occupancy Over Time')
+            ax4.set_title("Occupancy Over Time")
 
         self.figure.tight_layout()
         self.canvas.draw()
@@ -436,8 +482,9 @@ class ParkingDetectionGUI(QMainWindow):
             self.detector.cap.release()
         event.accept()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     gui = ParkingDetectionGUI()
     gui.show()
-    sys.exit(app.exec_()) 
+    sys.exit(app.exec_())
