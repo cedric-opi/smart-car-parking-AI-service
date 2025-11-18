@@ -503,7 +503,7 @@ if __name__ == "__main__":
     # Example usage
     detector = EnhancedParkingDetector(
         video_path='carPark.mp4',
-        image_path='carParkImg.png'
+        image_path='carParkImg.jpg'
     )
     
     # Process image for parking space selection

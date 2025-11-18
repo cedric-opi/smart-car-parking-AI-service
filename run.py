@@ -71,13 +71,13 @@ def main():
         epilog="""
 Examples:
   # Process an image
-  python run.py --image carParkImg.png
+  python run.py --image carParkImg.jpg
 
   # Process a video
   python run.py --video carPark.mp4
 
   # Process both (image for setup, video for detection)
-  python run.py --image carParkImg.png --video carPark.mp4
+  python run.py --image carParkImg.jpg --video carPark.mp4
 
 Keyboard Shortcuts (during execution):
   D - Detect vehicles and generate reports

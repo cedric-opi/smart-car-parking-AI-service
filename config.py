@@ -18,7 +18,7 @@ CAR_CLASSES = [2, 3, 5, 7]  # COCO classes: cars, motorcycles, buses, trucks
 # File Paths
 POSITION_FILE = 'CarParkPos'
 DEFAULT_VIDEO_PATH = 'carPark.mp4'
-DEFAULT_IMAGE_PATH = 'carParkImg.png'
+DEFAULT_IMAGE_PATH = 'carParkImg.jpg'
 
 # Directory Structure
 REPORTS_DIR = 'reports'
