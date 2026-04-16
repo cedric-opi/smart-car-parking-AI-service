@@ -67,25 +67,31 @@ def main():
         description="Advanced Car Parking Space Detection System",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  # Process an image
-  python run.py --image carParkImg.jpg
+ Examples:
+   # Process an image
+   python run.py --image carParkImg.jpg
 
-  # Process a video
-  python run.py --video carPark.mp4
+   # Process a video file
+   python run.py --video carPark.mp4
 
-  # Process both (image for setup, video for detection)
-  python run.py --image carParkImg.jpg --video carPark.mp4
+   # Process both (image for setup, video for detection)
+   python run.py --image carParkImg.jpg --video carPark.mp4
 
-Keyboard Shortcuts (during execution):
-  D - Detect vehicles and generate reports
-  S - Save parking space layout
-  R - Reset all parking spaces
-  Z - Undo last selection
-  Q - Quit application
+   # Live camera stream (RTSP)
+   python run.py --camera rtsp://user:pass@192.168.1.100:554/stream1
 
-For more information, visit: https://github.com/8harath/Car-Parking-Detection
-        """,
+   # Live camera stream (HTTP/MJPEG)
+   python run.py --camera http://192.168.1.100:8080/video
+
+ Keyboard Shortcuts (during execution):
+   D - Detect vehicles and generate reports
+   S - Save parking space layout
+   R - Reset all parking spaces
+   Z - Undo last selection
+   Q - Quit application
+
+ For more information, visit: https://github.com/8harath/Car-Parking-Detection
+         """,
     )
 
     parser.add_argument(
@@ -104,14 +110,38 @@ For more information, visit: https://github.com/8harath/Car-Parking-Detection
         "--mode",
         "-m",
         type=str,
-        choices=["image", "video", "both"],
+        choices=["image", "video", "camera", "both"],
         default="image",
-        help="Processing mode: image, video, or both",
+        help="Processing mode: image, video, camera, or both",
     )
 
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 
     parser.add_argument("--version", action="version", version="Car Parking Detection System v2.0")
+
+    parser.add_argument(
+        "--camera",
+        "-c",
+        type=str,
+        default=None,
+        help=(
+            "URL of the live camera stream for real-time parking detection. "
+            "Supports RTSP, HTTP, and MJPEG streams. "
+            "Examples: "
+            "rtsp://user:pass@192.168.1.100:554/stream1  "
+            "http://192.168.1.100:8080/video"
+        ),
+    )
+
+    parser.add_argument(
+        "--setup",
+        action="store_true",
+        help=(
+            "Capture a frame from the camera and open the interactive slot-editor "
+            "to define parking spaces. Use this BEFORE running detection. "
+            "Example: python run.py --camera http://<ip>/video --setup"
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -125,7 +155,9 @@ For more information, visit: https://github.com/8harath/Car-Parking-Detection
     print("\n🚀 Starting application...")
 
     # Determine mode
-    if args.video and not args.image:
+    if args.camera:
+        mode = "camera"
+    elif args.video and not args.image:
         mode = "video"
     elif args.image and not args.video:
         mode = "image"
@@ -150,17 +182,36 @@ For more information, visit: https://github.com/8harath/Car-Parking-Detection
             sys.exit(1)
         print(f"✓ Video file found: {args.video}")
 
+    if mode == "camera":
+        camera_url = args.camera or config.CAMERA_URL
+        if not camera_url:
+            logger.error("Camera mode requires --camera <url> argument or CAMERA_URL in config.py")
+            print("❌ Error: Camera mode requires a stream URL")
+            print("   Use: python run.py --camera rtsp://user:pass@<ip>:<port>/stream")
+            sys.exit(1)
+        print(f"✓ Camera URL: {camera_url}")
+
     try:
         # Initialize detector
         logger.info("Initializing parking detector...")
         print("\n⚙️  Initializing detector...")
 
+        camera_url = args.camera if mode == "camera" else None
+
         detector = EnhancedParkingDetector(
             image_path=args.image if mode in ["image", "both"] else None,
             video_path=args.video if mode in ["video", "both"] else None,
+            camera_url=camera_url,
         )
 
         print("✓ Detector initialized successfully")
+
+        # ── Camera setup mode (must run before detection) ──────────────────
+        if mode == "camera" and args.setup:
+            logger.info(f"Running camera setup for: {camera_url}")
+            print(f"\n🛠️  Camera setup mode: {camera_url}")
+            detector.setup_from_camera()
+            return 0
 
         # Process based on mode
         if mode == "image" or mode == "both":
@@ -184,6 +235,12 @@ For more information, visit: https://github.com/8harath/Car-Parking-Detection
             print("\nPress 'Q' to quit\n")
 
             detector.process_video()
+
+        if mode == "camera":
+            logger.info(f"Processing live camera stream: {camera_url}")
+            print(f"\n📹 Starting live camera detection: {camera_url}")
+
+            detector.process_camera()
 
         # Success message
         logger.info("Processing completed successfully")

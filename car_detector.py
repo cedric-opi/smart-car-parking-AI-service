@@ -110,19 +110,18 @@ class CarDetector:
         return occupancy_percentage > 30  # Return True if more than 30% of the space is occupied
 
     def process_detections(
-        self, results: Any, parking_spaces: List[Tuple[int, int]], image: np.ndarray
+        self, results: Any, parking_spaces: List[Tuple], image: np.ndarray
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Process YOLO detection results and match them with parking spaces"""
-        # Get bounding boxes for detected vehicles
+        """Process YOLO detection results and match them with parking spaces.
+
+        ``parking_spaces`` entries are ``(x, y, w, h)`` tuples produced by the
+        freeform slot editor.
+        """
         detections = []
         space_status = []
 
         for pos in parking_spaces:
-            x, y = pos
-            width, height = (
-                config.PARKING_WIDTH,
-                config.PARKING_HEIGHT,
-            )  # Standard parking space dimensions
+            x, y, width, height = pos
 
             # Check if it's a special parking space
             is_special = self.detect_special_parking(image, x, y, width, height)
@@ -148,6 +147,7 @@ class CarDetector:
             space_status.append(
                 {
                     "position": (x, y),
+                    "size": (width, height),
                     "is_special": is_special,
                     "is_occupied": is_occupied,
                     "vehicle_detected": vehicle_detected,
@@ -200,16 +200,17 @@ class CarDetector:
         # Draw parking spaces with different colors based on type and status
         for status in space_status:
             x, y = status["position"]
+            sw, sh = status.get("size", (config.PARKING_WIDTH, config.PARKING_HEIGHT))
             if status["is_special"]:
                 color = config.COLOR_SPECIAL  # Yellow for special parking
             else:
                 color = config.COLOR_REGULAR  # Magenta for regular parking
 
-            # Draw rectangle
+            # Draw rectangle using per-slot size
             cv2.rectangle(
                 img_with_detections,
                 (x, y),
-                (x + config.PARKING_WIDTH, y + config.PARKING_HEIGHT),
+                (x + sw, y + sh),
                 color,
                 2,
             )
