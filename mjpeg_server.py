@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # ── Shared state ──────────────────────────────────────────────────────────────
 _latest_jpeg: Optional[bytes] = None
 _frame_lock = threading.Lock()
-_frame_event = threading.Event()   # signals that a new frame is ready
+_frame_event = threading.Event()  # signals that a new frame is ready
 
 
 def _encode(img: np.ndarray, quality: int = 70) -> bytes:
@@ -52,8 +52,7 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _stream(self):
         self.send_response(200)
-        self.send_header("Content-Type",
-                         "multipart/x-mixed-replace; boundary=frame")
+        self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
@@ -67,12 +66,12 @@ class _Handler(BaseHTTPRequestHandler):
                 if data is None:
                     continue
                 try:
-                    self.wfile.write(b"--frame\r\n"
-                                     b"Content-Type: image/jpeg\r\n\r\n"
-                                     + data + b"\r\n")
+                    self.wfile.write(
+                        b"--frame\r\n" b"Content-Type: image/jpeg\r\n\r\n" + data + b"\r\n"
+                    )
                     self.wfile.flush()
                 except (BrokenPipeError, ConnectionResetError):
-                    break   # client disconnected
+                    break  # client disconnected
         except Exception:
             pass
 
@@ -90,7 +89,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def log_message(self, *_):
-        pass   # silence per-request logs
+        pass  # silence per-request logs
 
 
 # ── Public API ────────────────────────────────────────────────────────────────

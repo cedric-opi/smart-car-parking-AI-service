@@ -59,16 +59,18 @@ DEFAULT_IMAGE_PATH: Final[str] = "carParkImg.jpg"
 #   RTSP  : "rtsp://user:pass@192.168.1.100:554/stream1"
 #   HTTP  : "http://192.168.1.100:8080/video"
 #   MJPEG : "http://192.168.1.100/mjpg/video.mjpg"
-CAMERA_URL: Final[str] = ""          # leave empty; override via --camera CLI flag
-CAMERA_RECONNECT_DELAY: Final[int] = 3   # seconds to wait before reconnecting on failure
-CAMERA_FRAME_TIMEOUT: Final[int] = 30    # frames without a read before reconnecting
+CAMERA_URL: Final[str] = ""  # leave empty; override via --camera CLI flag
+CAMERA_RECONNECT_DELAY: Final[int] = 3  # seconds to wait before reconnecting on failure
+CAMERA_FRAME_TIMEOUT: Final[int] = 30  # frames without a read before reconnecting
 
 # Supabase Configuration (optional, for cloud sync)
 # Example:
 # SUPABASE_URL = "https://<project-ref>.supabase.co"
 # SUPABASE_KEY = "<anon-or-service-role-key>"
 SUPABASE_URL: Final[str] = "https://ysjpxserjwbthaownacy.supabase.co"
-SUPABASE_KEY: Final[str] = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlzanB4c2VyandidGhhb3duYWN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNzcwMzIsImV4cCI6MjA4NTY1MzAzMn0.Y2wAa7nii7UnNtezsWPx_1yVv43lRdsGdtPnBHRG6Y0"
+SUPABASE_KEY: Final[str] = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlzanB4c2VyandidGhhb3duYWN5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNzcwMzIsImV4cCI6MjA4NTY1MzAzMn0.Y2wAa7nii7UnNtezsWPx_1yVv43lRdsGdtPnBHRG6Y0"
+)
 SUPABASE_LOT_ID: Final[str] = "9cfae083-b963-40be-bb4a-03c1d1aa4cd8"
 SUPABASE_SLOTS_TABLE: Final[str] = "parking_slots"
 SUPABASE_SESSIONS_TABLE: Final[str] = "parking_sessions"

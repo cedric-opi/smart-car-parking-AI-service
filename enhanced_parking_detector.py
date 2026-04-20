@@ -97,8 +97,8 @@ class EnhancedParkingDetector:
         # Guidance path + session claim are BLOCKED until the frontend
         # creates a session (POST /start).  Toggled True by _check_pending_session().
         self._guidance_enabled: bool = False
-        self._pending_session_checked: bool = False   # True after first successful poll
-        self._last_pending_poll: float = 0.0          # rate-limit backend polls
+        self._pending_session_checked: bool = False  # True after first successful poll
+        self._last_pending_poll: float = 0.0  # rate-limit backend polls
         # Redirect cooldown: don't fire redirect more than once per N seconds
         self._last_redirect_time: float = 0.0
         self._redirect_cooldown: float = 3.0  # seconds between redirects
@@ -140,6 +140,7 @@ class EnhancedParkingDetector:
             # Remove the bad file so it doesn't cause the same error next run
             try:
                 import os as _os
+
                 _os.remove(config.POSITION_FILE)
             except OSError:
                 pass
@@ -301,7 +302,7 @@ class EnhancedParkingDetector:
                     if self.boundary_mode:
                         self.lot_boundary = (x1, y1, slot_w, slot_h)
                         self.save_parking_positions()
-                        self.boundary_mode = False # Auto-exit boundary mode after drawing
+                        self.boundary_mode = False  # Auto-exit boundary mode after drawing
                     else:
                         self.history.append(self.posList.copy())
                         self.posList.append((x1, y1, slot_w, slot_h))
@@ -362,7 +363,7 @@ class EnhancedParkingDetector:
             x, y, w, h = pos
             if w <= 0 or h <= 0:
                 continue
-            img_crop = img_pro[y: y + h, x: x + w]
+            img_crop = img_pro[y : y + h, x : x + w]
             if img_crop.size == 0:
                 continue
 
@@ -371,10 +372,7 @@ class EnhancedParkingDetector:
             # Scale threshold proportionally to slot area
             slot_area = w * h
             ref_area = config.PARKING_WIDTH * config.PARKING_HEIGHT
-            scaled_threshold = max(
-                1,
-                int(config.OCCUPANCY_THRESHOLD * slot_area / ref_area)
-            )
+            scaled_threshold = max(1, int(config.OCCUPANCY_THRESHOLD * slot_area / ref_area))
 
             raw_occupied = count >= scaled_threshold
 
@@ -392,20 +390,23 @@ class EnhancedParkingDetector:
             if idx == gate_idx:
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 140, 255), 4)
                 cvzone.putTextRect(
-                    img, "GATE",
+                    img,
+                    "GATE",
                     (x, y - 8),
-                    scale=1.2, thickness=2, offset=4,
+                    scale=1.2,
+                    thickness=2,
+                    offset=4,
                     colorR=(0, 140, 255),
                 )
                 continue
 
             if not occupied:
-                color = (0, 255, 0)    # green — empty
+                color = (0, 255, 0)  # green — empty
                 thickness = 5
                 space_counter += 1
                 empty_indices.append(idx)
             else:
-                color = (0, 0, 255)    # red — occupied
+                color = (0, 0, 255)  # red — occupied
                 thickness = 2
                 occupied_slots += 1
 
@@ -449,7 +450,7 @@ class EnhancedParkingDetector:
         if bg_gray is not None:
             curr_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             curr_gray = cv2.GaussianBlur(curr_gray, (5, 5), 0)
-            
+
             diff = cv2.absdiff(bg_gray, curr_gray)
             _, thresh = cv2.threshold(diff, 25, 255, cv2.THRESH_BINARY)
             kernel = np.ones((5, 5), np.uint8)
@@ -464,17 +465,14 @@ class EnhancedParkingDetector:
 
             count = 0
             if thresh is not None:
-                img_crop = thresh[y: y + h, x: x + w]
+                img_crop = thresh[y : y + h, x : x + w]
                 # Filter noise by ignoring very edge pixels if necessary
                 count = cv2.countNonZero(img_crop)
 
             # Scale threshold proportionally to slot area
             slot_area = w * h
             ref_area = config.PARKING_WIDTH * config.PARKING_HEIGHT
-            scaled_threshold = max(
-                1,
-                int(config.OCCUPANCY_THRESHOLD * slot_area / ref_area)
-            )
+            scaled_threshold = max(1, int(config.OCCUPANCY_THRESHOLD * slot_area / ref_area))
 
             raw_occupied = count >= scaled_threshold
 
@@ -491,9 +489,12 @@ class EnhancedParkingDetector:
                 gate_occupied = occupied
                 cv2.rectangle(img, (x, y), (x + w, y + h), (0, 140, 255), 4)
                 cvzone.putTextRect(
-                    img, "GATE",
+                    img,
+                    "GATE",
                     (x, y - 8),
-                    scale=1.2, thickness=2, offset=4,
+                    scale=1.2,
+                    thickness=2,
+                    offset=4,
                     colorR=(0, 140, 255),
                 )
                 continue
@@ -503,25 +504,28 @@ class EnhancedParkingDetector:
                 exit_gate_occupied = occupied
                 cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 255), 4)
                 cvzone.putTextRect(
-                    img, "EXIT GATE",
+                    img,
+                    "EXIT GATE",
                     (x, y - 8),
-                    scale=1.2, thickness=2, offset=4,
+                    scale=1.2,
+                    thickness=2,
+                    offset=4,
                     colorR=(255, 0, 255),
                 )
                 continue
 
             if not occupied:
-                color = (0, 255, 0)    # green — empty
+                color = (0, 255, 0)  # green — empty
                 thickness = 5
                 space_counter += 1
                 empty_indices.append(idx)
             else:
-                color = (0, 0, 255)    # red — occupied
+                color = (0, 0, 255)  # red — occupied
                 thickness = 2
                 occupied_slots += 1
 
             cv2.rectangle(img, (x, y), (x + w, y + h), color, thickness)
-            
+
             cvzone.putTextRect(
                 img,
                 str(count),
@@ -534,9 +538,11 @@ class EnhancedParkingDetector:
 
         # Display overall statistics (excluding gate slot)
         non_gate_total = len(self.posList)
-        if 0 <= gate_idx < len(self.posList): non_gate_total -= 1
-        if 0 <= exit_gate_idx < len(self.posList): non_gate_total -= 1
-        
+        if 0 <= gate_idx < len(self.posList):
+            non_gate_total -= 1
+        if 0 <= exit_gate_idx < len(self.posList):
+            non_gate_total -= 1
+
         cvzone.putTextRect(
             img,
             f"Free: {space_counter}/{non_gate_total}",
@@ -547,7 +553,14 @@ class EnhancedParkingDetector:
             colorR=(0, 200, 0),
         )
 
-        return space_counter, occupied_slots, empty_indices, gate_occupied, exit_gate_occupied, thresh
+        return (
+            space_counter,
+            occupied_slots,
+            empty_indices,
+            gate_occupied,
+            exit_gate_occupied,
+            thresh,
+        )
 
     # ── Parking Reservation Database ─────────────────────────────────────────
 
@@ -556,14 +569,12 @@ class EnhancedParkingDetector:
         try:
             os.makedirs(os.path.dirname(config.PARKING_DB_FILE), exist_ok=True)
             conn = sqlite3.connect(config.PARKING_DB_FILE)
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS reservations (
                     slot_index  INTEGER PRIMARY KEY,
                     reserved_at TEXT NOT NULL
                 )
-                """
-            )
+                """)
             conn.commit()
             conn.close()
             logger.info(f"Parking DB ready at {config.PARKING_DB_FILE}")
@@ -729,8 +740,9 @@ class EnhancedParkingDetector:
                 except Exception:
                     pass
                 logger.error(f"Supabase slot update failed for slot {slot_number}: {e}{error_body}")
-                
+
         import threading
+
         threading.Thread(target=_run, daemon=True).start()
 
     def _supabase_sync_layout(self) -> None:
@@ -795,9 +807,7 @@ class EnhancedParkingDetector:
                         error_body = f" response={patch_resp.text}"
                 except Exception:
                     pass
-                logger.error(
-                    f"Supabase layout sync failed for slot {slot_number}: {e}{error_body}"
-                )
+                logger.error(f"Supabase layout sync failed for slot {slot_number}: {e}{error_body}")
 
     def _check_pending_session(self) -> bool:
         """Poll the backend once to see if the frontend created a pending session.
@@ -805,6 +815,7 @@ class EnhancedParkingDetector:
         Rate-limited to one poll per 1.5 seconds.
         """
         import time as _time
+
         now = _time.time()
         if now - self._last_pending_poll < 1.5:
             return self._guidance_enabled
@@ -838,9 +849,7 @@ class EnhancedParkingDetector:
         try:
             # Claim the session created by the frontend (driver typed their plate).
             # We do NOT create a new session here — the frontend already did that.
-            payload = {
-                "slot_id": str(slot_row["id"])
-            }
+            payload = {"slot_id": str(slot_row["id"])}
             resp = requests.post(
                 f"{config.BACKEND_URL}/session/claim",
                 json=payload,
@@ -848,10 +857,12 @@ class EnhancedParkingDetector:
             )
             resp.raise_for_status()
             data = resp.json()
-            
+
             # Lưu lại Session ID do Backend trả về để dùng lúc xe ra
             self._active_session_by_slot[slot_idx] = data["session_id"]
-            logger.info(f"Backend started session for slot {slot_idx + 1}. ID: {data['session_id']}")
+            logger.info(
+                f"Backend started session for slot {slot_idx + 1}. ID: {data['session_id']}"
+            )
         except Exception as e:
             logger.error(f"Backend auto-checkin failed for slot {slot_idx + 1}: {e}")
 
@@ -862,13 +873,13 @@ class EnhancedParkingDetector:
         session_id = self._active_session_by_slot.pop(slot_idx, None)
         if not session_id:
             return
-            
+
         def _run():
             try:
                 # GỌI SANG BACKEND ĐỂ CHỐT ĐỖ XE / HOẶC HOÀN THÀNH
                 payload = {
                     "session_id": session_id,
-                    "selected_slot_id": None # Backend sẽ tự xử lý
+                    "selected_slot_id": None,  # Backend sẽ tự xử lý
                 }
                 resp = requests.post(
                     f"{config.BACKEND_URL}/finish",
@@ -879,8 +890,9 @@ class EnhancedParkingDetector:
                 logger.info(f"Backend completed session for slot {slot_idx + 1}.")
             except Exception as e:
                 logger.error(f"Backend complete session failed: {e}")
-                
+
         import threading
+
         threading.Thread(target=_run, daemon=True).start()
 
     def _supabase_redirect_session(self, session_id: str, new_slot_idx: int) -> None:
@@ -889,13 +901,10 @@ class EnhancedParkingDetector:
         slot_row = self._supabase_get_slot_row(new_slot_idx)
         if not slot_row:
             return
-            
+
         def _run():
             try:
-                payload = {
-                    "session_id": session_id,
-                    "new_slot_id": str(slot_row["id"])
-                }
+                payload = {"session_id": session_id, "new_slot_id": str(slot_row["id"])}
                 resp = requests.post(
                     f"{config.BACKEND_URL}/redirect",
                     json=payload,
@@ -905,15 +914,14 @@ class EnhancedParkingDetector:
                 logger.info(f"Backend redirected session to slot {new_slot_idx + 1}")
             except Exception as e:
                 logger.error(f"Backend redirect session failed: {e}")
-                
+
         import threading
+
         threading.Thread(target=_run, daemon=True).start()
 
     # ── Path Guidance ─────────────────────────────────────────────────────────
 
-    def find_closest_empty_slot(
-        self, gate_idx: int, empty_indices: List[int]
-    ) -> Optional[int]:
+    def find_closest_empty_slot(self, gate_idx: int, empty_indices: List[int]) -> Optional[int]:
         """Return the index of the empty slot nearest to the gate.
 
         Slots already reserved in the DB or currently being tracked for an
@@ -932,8 +940,10 @@ class EnhancedParkingDetector:
         return min(
             available,
             key=lambda i: math.dist(
-                (self.posList[i][0] + self.posList[i][2] // 2,
-                 self.posList[i][1] + self.posList[i][3] // 2),
+                (
+                    self.posList[i][0] + self.posList[i][2] // 2,
+                    self.posList[i][1] + self.posList[i][3] // 2,
+                ),
                 (gate_cx, gate_cy),
             ),
         )
@@ -1014,13 +1024,21 @@ class EnhancedParkingDetector:
         open_heap: List = []
         # State: (f, g, c, r, prev_dc, prev_dr)
         heapq.heappush(open_heap, (h(sc, sr), 0, sc, sr, 0, 0))
-        came_from: Dict[Tuple[int, int, int, int], Optional[Tuple[int, int, int, int]]] = {(sc, sr, 0, 0): None}
+        came_from: Dict[Tuple[int, int, int, int], Optional[Tuple[int, int, int, int]]] = {
+            (sc, sr, 0, 0): None
+        }
         g_score: Dict[Tuple[int, int, int, int], float] = {(sc, sr, 0, 0): 0.0}
 
         # 8-directional movement
         directions = [
-            (1, 0), (-1, 0), (0, 1), (0, -1),
-            (1, 1), (1, -1), (-1, 1), (-1, -1),
+            (1, 0),
+            (-1, 0),
+            (0, 1),
+            (0, -1),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
         ]
 
         while open_heap:
@@ -1042,16 +1060,16 @@ class EnhancedParkingDetector:
                     continue
                 if grid[nr, nc]:
                     continue  # blocked
-                
+
                 step_cost = math.sqrt(dc * dc + dr * dr)
-                
+
                 # Apply penalty if direction changes (and we were already moving)
                 penalty = 0.0
                 if (pdc, pdr) != (0, 0) and (pdc, pdr) != (dc, dr):
                     penalty = turn_penalty
-                    
+
                 ng = g + step_cost + penalty
-                
+
                 state = (nc, nr, dc, dr)
                 if ng < g_score.get(state, float("inf")):
                     g_score[state] = ng
@@ -1061,9 +1079,7 @@ class EnhancedParkingDetector:
         # Fallback: straight line if A* cannot find a route
         return [start, goal]
 
-    def _smooth_path(
-        self, path: List[Tuple[int, int]], cell: int
-    ) -> List[Tuple[int, int]]:
+    def _smooth_path(self, path: List[Tuple[int, int]], cell: int) -> List[Tuple[int, int]]:
         """Convert grid-cell path to pixel coordinates and reduce intermediate
         waypoints using a simple line-of-sight shortcut pass."""
         # Convert to pixel centres
@@ -1078,7 +1094,12 @@ class EnhancedParkingDetector:
         return smoothed
 
     def draw_path_guidance(
-        self, img: np.ndarray, gate_idx: int, closest_idx: Optional[int], is_full: bool = False, moving_pos: Optional[Tuple[int, int]] = None
+        self,
+        img: np.ndarray,
+        gate_idx: int,
+        closest_idx: Optional[int],
+        is_full: bool = False,
+        moving_pos: Optional[Tuple[int, int]] = None,
     ) -> None:
         """Draw an obstacle-avoiding arrow path from the gate to the nearest free slot.
 
@@ -1097,16 +1118,19 @@ class EnhancedParkingDetector:
 
         # ── Always highlight the gate slot ────────────────────────────────────
         cv2.rectangle(img, (gx - 3, gy - 3), (gx + gw + 3, gy + gh + 3), (0, 140, 255), 4)
-        
+
         # Track dot at actual tracking centroid
         if moving_pos is not None:
             cv2.circle(img, (start_px_x, start_px_y), 8, (0, 255, 0), -1)
             cv2.circle(img, (start_px_x, start_px_y), 14, (0, 150, 0), 2)
-            
+
         cvzone.putTextRect(
-            img, "GATE",
+            img,
+            "GATE",
             (gx, gy - 8),
-            scale=1.3, thickness=2, offset=5,
+            scale=1.3,
+            thickness=2,
+            offset=5,
             colorR=(0, 120, 255),
         )
 
@@ -1119,9 +1143,12 @@ class EnhancedParkingDetector:
                 cv2.rectangle(overlay, (bx1, by1), (bx2, by2), (0, 0, 160), -1)
                 cv2.addWeighted(overlay, 0.75, img, 0.25, 0, img)
                 cvzone.putTextRect(
-                    img, "PARKING FULL",
+                    img,
+                    "PARKING FULL",
                     (bx1 + 20, by2 - 14),
-                    scale=2.5, thickness=3, offset=8,
+                    scale=2.5,
+                    thickness=3,
+                    offset=8,
                     colorR=(0, 0, 160),
                 )
             return
@@ -1136,7 +1163,9 @@ class EnhancedParkingDetector:
             img,
             f"SLOT {closest_idx + 1}",
             (sx, sy - 10),
-            scale=1.5, thickness=2, offset=5,
+            scale=1.5,
+            thickness=2,
+            offset=5,
             colorR=(0, 200, 200),
         )
 
@@ -1159,7 +1188,7 @@ class EnhancedParkingDetector:
 
         path_cells = self._astar(grid, start_cell, s_cell)
         waypoints = self._smooth_path(path_cells, cell)
-        
+
         # Anchor visual line exactly to the car coordinates and slot coordinates
         if waypoints:
             waypoints[0] = (start_px_x, start_px_y)
@@ -1195,19 +1224,21 @@ class EnhancedParkingDetector:
 
         # ── Bottom-left guidance banner ───────────────────────────────────────
         dist_px = math.dist((gate_cx, gate_cy), (slot_cx, slot_cy))
-        dist_m = round(dist_px / config.PIXELS_PER_METER, 1) if config.PIXELS_PER_METER > 0 else None
+        dist_m = (
+            round(dist_px / config.PIXELS_PER_METER, 1) if config.PIXELS_PER_METER > 0 else None
+        )
         dist_str = f"  (~{dist_m} m)" if dist_m else ""
         cvzone.putTextRect(
             img,
             f"\u2794 Drive to Slot {closest_idx + 1}{dist_str}",
             (10, h_img - 20),
-            scale=1.8, thickness=2, offset=8,
+            scale=1.8,
+            thickness=2,
+            offset=8,
             colorR=(0, 140, 0),
         )
 
     # ─────────────────────────────────────────────────────────────────────────
-
-
 
     def generate_csv_report(
         self, total_slots: int, occupied_slots: int, available_slots: int
@@ -1265,9 +1296,16 @@ class EnhancedParkingDetector:
                 if not success:
                     break
 
-                # Currently video streaming with background subtraction is limited. 
+                # Currently video streaming with background subtraction is limited.
                 # Use none as background or set it up if needed.
-                available_slots, occupied_slots, _empty, gate_occupied, exit_gate_occupied, thresh = self.check_parking_space_diff(img, None)
+                (
+                    available_slots,
+                    occupied_slots,
+                    _empty,
+                    gate_occupied,
+                    exit_gate_occupied,
+                    thresh,
+                ) = self.check_parking_space_diff(img, None)
 
                 # Generate CSV report every 30 frames
                 if int(cap.get(cv2.CAP_PROP_POS_FRAMES)) % 30 == 0:
@@ -1396,13 +1434,22 @@ class EnhancedParkingDetector:
                 frame_count += 1
 
                 # Background Subtraction Detection
-                available_slots, occupied_slots, empty_indices, gate_occupied, exit_gate_occupied, thresh = self.check_parking_space_diff(img, bg_gray)
+                (
+                    available_slots,
+                    occupied_slots,
+                    empty_indices,
+                    gate_occupied,
+                    exit_gate_occupied,
+                    thresh,
+                ) = self.check_parking_space_diff(img, bg_gray)
 
                 # ── Path guidance + reservation logic ─────────────────────────
                 gate_idx = config.GATE_SLOT_INDEX
                 exit_gate_idx = config.EXIT_GATE_SLOT_INDEX
                 if self.posList and 0 <= gate_idx < len(self.posList):
-                    empty_excl_gate = [i for i in empty_indices if i != gate_idx and i != exit_gate_idx]
+                    empty_excl_gate = [
+                        i for i in empty_indices if i != gate_idx and i != exit_gate_idx
+                    ]
 
                     # ── Release DB slots whose sensor now reads empty ──────────
                     for reserved_idx in self._get_reserved_slots():
@@ -1415,7 +1462,7 @@ class EnhancedParkingDetector:
                             elif now_ts - self._reserved_empty_since[reserved_idx] >= 2.0:
                                 self._free_slot(reserved_idx)
                                 self._reserved_empty_since.pop(reserved_idx, None)
-                                
+
                                 # Start tracking exiting car
                                 if 0 <= reserved_idx < len(self.posList):
                                     sx, sy, sw, sh = self.posList[reserved_idx]
@@ -1423,7 +1470,7 @@ class EnhancedParkingDetector:
                                     self._exiting_cars_tracking_pos[reserved_idx] = slot_center
                                     self._exiting_cars_loss_frames[reserved_idx] = 0
                                     self._exiting_cars_expected_area[reserved_idx] = None
-                                
+
                                 if self._recommended_slot == reserved_idx:
                                     self._recommended_slot = None
                                     self._recommended_occupied_start = None
@@ -1435,10 +1482,12 @@ class EnhancedParkingDetector:
                     # background subtraction, but heavily filtered to ignore pencils/hands.
                     all_objects: List[Dict[str, Any]] = []
 
-                    occupied_indices = [i for i in range(len(self.posList)) if i not in empty_indices]
+                    occupied_indices = [
+                        i for i in range(len(self.posList)) if i not in empty_indices
+                    ]
                     reserved_slots = set(self._get_reserved_slots())
-                    
-                    if not hasattr(self, '_slot_occupied_since'):
+
+                    if not hasattr(self, "_slot_occupied_since"):
                         self._slot_occupied_since = {}
                     now_ts = time.time()
                     for idx in occupied_indices:
@@ -1448,27 +1497,34 @@ class EnhancedParkingDetector:
                     for idx in list(self._slot_occupied_since.keys()):
                         if idx not in occupied_indices or idx in reserved_slots:
                             del self._slot_occupied_since[idx]
-                            
+
                     blocked_rects = []
-                    recommended = getattr(self, '_recommended_slot', None)
-                    
+                    recommended = getattr(self, "_recommended_slot", None)
+
                     min_px_x = min(p[0] for p in self.posList) - 40
                     max_px_x = max(p[0] + p[2] for p in self.posList) + 40
                     min_px_y = min(p[1] for p in self.posList) - 40
                     max_px_y = max(p[1] + p[3] for p in self.posList) + 40
-                    
+
                     for idx, pos in enumerate(self.posList):
                         if idx != gate_idx and idx != recommended:
-                            is_recently_occupied = (now_ts - self._slot_occupied_since.get(idx, 0) < 15.0)
-                            if not is_recently_occupied and (idx in occupied_indices or idx in reserved_slots):
+                            is_recently_occupied = (
+                                now_ts - self._slot_occupied_since.get(idx, 0) < 15.0
+                            )
+                            if not is_recently_occupied and (
+                                idx in occupied_indices or idx in reserved_slots
+                            ):
                                 blocked_rects.append(pos)
-                    
+
                     if thresh is not None:
-                        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                        
+                        contours, _ = cv2.findContours(
+                            thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                        )
+
                         avg_slot_area = (
                             sum(w * h for (_, _, w, h) in self.posList) / len(self.posList)
-                            if self.posList else 2000
+                            if self.posList
+                            else 2000
                         )
                         car_min = avg_slot_area * 0.25
                         car_max = avg_slot_area * 1.50
@@ -1481,14 +1537,14 @@ class EnhancedParkingDetector:
                                 r_width, r_height = rect[1]
                                 if r_width == 0 or r_height == 0:
                                     continue
-                                    
+
                                 aspect_ratio = max(r_width, r_height) / min(r_width, r_height)
-                                
+
                                 # 1. Pencils are very long and thin (high aspect ratio)
                                 # 2. Cars are generally rectangular (aspect ratio ~ 1.2 to 2.5)
                                 if aspect_ratio > 3.0:
                                     continue  # Ignore: Too long/thin (pencil or arm)
-                                    
+
                                 hull = cv2.convexHull(c)
                                 hull_area = cv2.contourArea(hull)
                                 if hull_area > 0:
@@ -1502,56 +1558,69 @@ class EnhancedParkingDetector:
                                 if M["m00"] != 0:
                                     cx = int(M["m10"] / M["m00"])
                                     cy = int(M["m01"] / M["m00"])
-                                    
-                                    if not (min_px_x <= cx <= max_px_x and min_px_y <= cy <= max_px_y):
+
+                                    if not (
+                                        min_px_x <= cx <= max_px_x and min_px_y <= cy <= max_px_y
+                                    ):
                                         continue  # Outside lot
-                                        
+
                                     is_blocked = False
-                                    for (brx, bry, brw, brh) in blocked_rects:
+                                    for brx, bry, brw, brh in blocked_rects:
                                         # Expand blocking margin to swallow shadows and bleeding pixels
                                         bm = 30
-                                        if brx - bm <= cx <= brx + brw + bm and bry - bm <= cy <= bry + brh + bm:
+                                        if (
+                                            brx - bm <= cx <= brx + brw + bm
+                                            and bry - bm <= cy <= bry + brh + bm
+                                        ):
                                             is_blocked = True
                                             break
-                                    
+
                                     if not is_blocked:
-                                        all_objects.append({'cam': (cx, cy), 'area': area})
+                                        all_objects.append({"cam": (cx, cy), "area": area})
 
                     # ── Track Exiting Cars ────────────────────────────
                     for s_idx in list(self._exiting_cars_tracking_pos.keys()):
                         current_pos = self._exiting_cars_tracking_pos[s_idx]
                         expected_area = self._exiting_cars_expected_area.get(s_idx)
-                        
+
                         dynamic_jump_px = 65
                         best_obj = None
                         best_score = float("inf")
                         for obj in all_objects:
-                            d = math.dist(obj['cam'], current_pos)
+                            d = math.dist(obj["cam"], current_pos)
                             if d > dynamic_jump_px:
                                 continue
                             area_term = 0.0
                             if expected_area and expected_area > 1:
-                                area_term = abs(obj['area'] - expected_area) / expected_area
+                                area_term = abs(obj["area"] - expected_area) / expected_area
                             score = d + (35.0 * area_term)
                             if score < best_score:
                                 best_score = score
                                 best_obj = obj
-                                
+
                         if best_obj is not None:
-                            best_cam = best_obj['cam']
+                            best_cam = best_obj["cam"]
                             SMOOTH_ALPHA = 0.45
                             self._exiting_cars_tracking_pos[s_idx] = (
-                                int(current_pos[0] * (1 - SMOOTH_ALPHA) + best_cam[0] * SMOOTH_ALPHA),
-                                int(current_pos[1] * (1 - SMOOTH_ALPHA) + best_cam[1] * SMOOTH_ALPHA),
+                                int(
+                                    current_pos[0] * (1 - SMOOTH_ALPHA) + best_cam[0] * SMOOTH_ALPHA
+                                ),
+                                int(
+                                    current_pos[1] * (1 - SMOOTH_ALPHA) + best_cam[1] * SMOOTH_ALPHA
+                                ),
                             )
                             if not expected_area:
-                                self._exiting_cars_expected_area[s_idx] = best_obj['area']
+                                self._exiting_cars_expected_area[s_idx] = best_obj["area"]
                             else:
-                                self._exiting_cars_expected_area[s_idx] = 0.85 * expected_area + 0.15 * best_obj['area']
+                                self._exiting_cars_expected_area[s_idx] = (
+                                    0.85 * expected_area + 0.15 * best_obj["area"]
+                                )
                             self._exiting_cars_loss_frames[s_idx] = 0
                         else:
                             self._exiting_cars_loss_frames[s_idx] += 1
-                            if self._exiting_cars_loss_frames[s_idx] > 30: # 1 second loss -> drop tracking
+                            if (
+                                self._exiting_cars_loss_frames[s_idx] > 30
+                            ):  # 1 second loss -> drop tracking
                                 del self._exiting_cars_tracking_pos[s_idx]
                                 del self._exiting_cars_loss_frames[s_idx]
                                 if s_idx in self._exiting_cars_expected_area:
@@ -1561,7 +1630,7 @@ class EnhancedParkingDetector:
                     is_full_lot = False
 
                     if all_objects:
-                        if getattr(self, '_tracking_car_pos', None) is None:
+                        if getattr(self, "_tracking_car_pos", None) is None:
                             # START tracking: MUST start at the contour physically nearest the gate,
                             # ignoring random large blobs in the background.
                             if gate_occupied and self._session_active_slot_idx is None:
@@ -1575,35 +1644,34 @@ class EnhancedParkingDetector:
                                     gx, gy, gw, gh = self.posList[gate_idx]
                                     gate_center = (gx + gw // 2, gy + gh // 2)
                                     closest_to_gate = min(
-                                        all_objects,
-                                        key=lambda o: math.dist(o['cam'], gate_center)
+                                        all_objects, key=lambda o: math.dist(o["cam"], gate_center)
                                     )
                                     # Expanded search radius: accept any object within
                                     # 60 % of the frame width so we always start tracking
                                     # even if the car isn't pixel-perfect at gate center.
                                     h_img, w_img = img.shape[:2]
                                     max_dist = w_img * 0.60
-                                    if math.dist(closest_to_gate['cam'], gate_center) < max_dist:
-                                        self._tracking_car_pos = closest_to_gate['cam']
-                                        self._last_known_car_pos = closest_to_gate['cam']
+                                    if math.dist(closest_to_gate["cam"], gate_center) < max_dist:
+                                        self._tracking_car_pos = closest_to_gate["cam"]
+                                        self._last_known_car_pos = closest_to_gate["cam"]
                                         self._tracking_loss_frames = 0
-                                        self._tracking_expected_area = closest_to_gate['area']
+                                        self._tracking_expected_area = closest_to_gate["area"]
                             elif self._session_active_slot_idx is not None:
                                 # RECOVER tracking mid-journey.
                                 # Only use the target slot center as a fallback
                                 # if we have absolutely no last-known position.
                                 # Prefer last known car pos to avoid snapping to
                                 # the wrong slot when the car is still near the gate.
-                                if getattr(self, '_last_known_car_pos', None) is not None:
+                                if getattr(self, "_last_known_car_pos", None) is not None:
                                     recover_center = self._last_known_car_pos
                                     closest_to_target = min(
                                         all_objects,
-                                        key=lambda o: math.dist(o['cam'], recover_center)
+                                        key=lambda o: math.dist(o["cam"], recover_center),
                                     )
-                                    self._tracking_car_pos = closest_to_target['cam']
-                                    self._last_known_car_pos = closest_to_target['cam']
+                                    self._tracking_car_pos = closest_to_target["cam"]
+                                    self._last_known_car_pos = closest_to_target["cam"]
                                     self._tracking_loss_frames = 0
-                                    self._tracking_expected_area = closest_to_target['area']
+                                    self._tracking_expected_area = closest_to_target["area"]
                                 # If no last_known position at all, leave tracking as None;
                                 # the dot will only appear once tracking re-initialises.
                         else:
@@ -1616,13 +1684,13 @@ class EnhancedParkingDetector:
                             best_obj = None
                             best_score = float("inf")
                             for obj in all_objects:
-                                d = math.dist(obj['cam'], current_pos)
+                                d = math.dist(obj["cam"], current_pos)
                                 if d > dynamic_jump_px:
                                     continue
 
                                 area_term = 0.0
                                 if expected_area and expected_area > 1:
-                                    area_term = abs(obj['area'] - expected_area) / expected_area
+                                    area_term = abs(obj["area"] - expected_area) / expected_area
 
                                 score = d + (35.0 * area_term)
                                 if score < best_score:
@@ -1630,33 +1698,40 @@ class EnhancedParkingDetector:
                                     best_obj = obj
 
                             if best_obj is not None:
-                                best_cam = best_obj['cam']
+                                best_cam = best_obj["cam"]
                                 # APPLY EMA SMOOTHING from user's algorithm
                                 SMOOTH_ALPHA = 0.45
                                 smoothed_pos = (
-                                    int(current_pos[0] * (1 - SMOOTH_ALPHA) + best_cam[0] * SMOOTH_ALPHA),
-                                    int(current_pos[1] * (1 - SMOOTH_ALPHA) + best_cam[1] * SMOOTH_ALPHA),
+                                    int(
+                                        current_pos[0] * (1 - SMOOTH_ALPHA)
+                                        + best_cam[0] * SMOOTH_ALPHA
+                                    ),
+                                    int(
+                                        current_pos[1] * (1 - SMOOTH_ALPHA)
+                                        + best_cam[1] * SMOOTH_ALPHA
+                                    ),
                                 )
                                 self._tracking_last_step = math.dist(current_pos, smoothed_pos)
                                 self._tracking_car_pos = smoothed_pos
                                 self._last_known_car_pos = smoothed_pos
                                 if self._tracking_expected_area is None:
-                                    self._tracking_expected_area = best_obj['area']
+                                    self._tracking_expected_area = best_obj["area"]
                                 else:
                                     self._tracking_expected_area = (
-                                        0.85 * self._tracking_expected_area + 0.15 * best_obj['area']
+                                        0.85 * self._tracking_expected_area
+                                        + 0.15 * best_obj["area"]
                                     )
                                 self._tracking_loss_frames = 0
                             else:
                                 self._tracking_loss_frames += 1
-                                if self._tracking_loss_frames > 45: # Tolerant 1.5s visual dropout
+                                if self._tracking_loss_frames > 45:  # Tolerant 1.5s visual dropout
                                     self._tracking_car_pos = None
                                     self._tracking_loss_frames = 0
                                     self._tracking_last_step = 0.0
                                     self._tracking_expected_area = None
                     else:
                         # No moving blobs this frame.  Hold last known position during grace period.
-                        grace_limit = getattr(self, '_tracking_loss_frames', 0) + 1
+                        grace_limit = getattr(self, "_tracking_loss_frames", 0) + 1
                         self._tracking_loss_frames = grace_limit
                         # Keep guidance stable longer when a car is already being guided
                         # or when parking verification is in progress.
@@ -1671,10 +1746,13 @@ class EnhancedParkingDetector:
                             self._tracking_last_step = 0.0
                             self._tracking_expected_area = None
 
-                    tracking_active = getattr(self, '_tracking_car_pos', None) is not None
+                    tracking_active = getattr(self, "_tracking_car_pos", None) is not None
 
                     if not tracking_active and self._session_active_slot_idx is None:
-                        if getattr(self, '_parked_confirm_until', None) is None or time.time() > self._parked_confirm_until:
+                        if (
+                            getattr(self, "_parked_confirm_until", None) is None
+                            or time.time() > self._parked_confirm_until
+                        ):
                             closest = None
                             self._recommended_slot = None
                             self._recommended_occupied_start = None
@@ -1687,7 +1765,7 @@ class EnhancedParkingDetector:
                             self._recommended_slot = self._session_active_slot_idx
 
                         # Actively tracking a car (or recovering) — draw dot + live-recalculated path each frame
-                        
+
                         # ── Confirm parking when the recommended slot turns occupied ─
                         if self._parked_confirm_until is not None:
                             # Showing confirmation banner
@@ -1699,7 +1777,9 @@ class EnhancedParkingDetector:
                                         img,
                                         f"✓ Parked in Slot {confirmed_slot + 1}!",
                                         (w_img // 2 - 220, h_img // 2),
-                                        scale=2.5, thickness=3, offset=10,
+                                        scale=2.5,
+                                        thickness=3,
+                                        offset=10,
                                         colorR=(0, 160, 0),
                                     )
                                 closest = None
@@ -1709,14 +1789,17 @@ class EnhancedParkingDetector:
                                 self._recommended_slot = None
                                 self._recommended_occupied_start = None
                                 closest = self.find_closest_empty_slot(gate_idx, empty_excl_gate)
-                                is_full_lot = (closest is None)
+                                is_full_lot = closest is None
                                 if closest is not None:
                                     self._recommended_slot = closest
                                     if gate_occupied and self._session_active_slot_idx is None:
                                         self._supabase_start_session(closest)
                                         self._session_active_slot_idx = closest
 
-                        elif self._recommended_slot is not None and self._recommended_slot != gate_idx:
+                        elif (
+                            self._recommended_slot is not None
+                            and self._recommended_slot != gate_idx
+                        ):
                             # Find which slot the tracked car is currently in (to allow parking in ANY slot)
                             car_in_any_slot_idx = None
                             now_ts = time.time()
@@ -1726,8 +1809,10 @@ class EnhancedParkingDetector:
                                     if idx_test == gate_idx or idx_test == exit_gate_idx:
                                         continue
                                     margin = -20  # Expand acceptable area
-                                    if (sx + margin <= tx <= sx + sw - margin
-                                        and sy + margin <= ty <= sy + sh - margin):
+                                    if (
+                                        sx + margin <= tx <= sx + sw - margin
+                                        and sy + margin <= ty <= sy + sh - margin
+                                    ):
                                         car_in_any_slot_idx = idx_test
                                         break
 
@@ -1736,21 +1821,24 @@ class EnhancedParkingDetector:
                             # parked in when the green dot tracking failed mid-journey.
                             if car_in_any_slot_idx is None and self._guidance_enabled:
                                 newly_occupied = [
-                                    idx for idx in occupied_indices
-                                    if idx not in getattr(self, '_occupied_prev', set())
+                                    idx
+                                    for idx in occupied_indices
+                                    if idx not in getattr(self, "_occupied_prev", set())
                                     and idx != gate_idx
                                     and idx != exit_gate_idx
                                 ]
                                 if newly_occupied:
-                                    if getattr(self, '_last_known_car_pos', None) is not None:
+                                    if getattr(self, "_last_known_car_pos", None) is not None:
                                         ref = self._last_known_car_pos
                                         car_in_any_slot_idx = min(
                                             newly_occupied,
                                             key=lambda i: math.dist(
-                                                (self.posList[i][0] + self.posList[i][2] // 2,
-                                                 self.posList[i][1] + self.posList[i][3] // 2),
+                                                (
+                                                    self.posList[i][0] + self.posList[i][2] // 2,
+                                                    self.posList[i][1] + self.posList[i][3] // 2,
+                                                ),
                                                 ref,
-                                            )
+                                            ),
                                         )
                                     elif len(newly_occupied) == 1:
                                         car_in_any_slot_idx = newly_occupied[0]
@@ -1776,8 +1864,12 @@ class EnhancedParkingDetector:
                                         if self._session_active_slot_idx == old:
                                             sess_id = self._active_session_by_slot.pop(old, None)
                                             if sess_id:
-                                                self._active_session_by_slot[car_in_any_slot_idx] = sess_id
-                                                self._supabase_redirect_session(sess_id, car_in_any_slot_idx)
+                                                self._active_session_by_slot[
+                                                    car_in_any_slot_idx
+                                                ] = sess_id
+                                                self._supabase_redirect_session(
+                                                    sess_id, car_in_any_slot_idx
+                                                )
                                             self._session_active_slot_idx = car_in_any_slot_idx
                                         # Reset verification timer so it starts fresh for the new slot
                                         self._recommended_occupied_start = None
@@ -1791,30 +1883,32 @@ class EnhancedParkingDetector:
                                 self._car_seen_in_recommended_until is not None
                                 and now_ts <= self._car_seen_in_recommended_until
                             )
-                            
+
                             # Decide which slot we are evaluating: always use current recommended
                             # (which has already been updated above if driver deviated)
-                            recent_slot = getattr(self, '_recent_any_slot_idx', None)
+                            recent_slot = getattr(self, "_recent_any_slot_idx", None)
                             if recent_in_slot and recent_slot is not None:
                                 rec_idx = recent_slot
                             else:
                                 rec_idx = self._recommended_slot
 
                             slot_is_occupied = rec_idx not in empty_excl_gate
-                            car_in_eval_slot = (car_in_any_slot_idx == rec_idx)
-                            
+                            car_in_eval_slot = car_in_any_slot_idx == rec_idx
+
                             # Start/check confirmation only when the tracked car is inside the evaluated slot
                             # OR was seen there very recently, OR if it's our active session and it physically filled up
                             condition_met = slot_is_occupied and (
-                                car_in_eval_slot 
+                                car_in_eval_slot
                                 or (recent_in_slot and recent_slot == rec_idx)
                                 or (self._session_active_slot_idx == rec_idx)
                             )
-                            
+
                             if condition_met:
-                                getattr(self, '_recommended_occupied_loss_time', None) # Initialise securely
-                                self._recommended_occupied_loss_time = None # Reset loss timer
-                                
+                                getattr(
+                                    self, "_recommended_occupied_loss_time", None
+                                )  # Initialise securely
+                                self._recommended_occupied_loss_time = None  # Reset loss timer
+
                                 if self._recommended_occupied_start is None:
                                     self._recommended_occupied_start = time.time()
                                     self._verifying_slot = rec_idx
@@ -1830,25 +1924,32 @@ class EnhancedParkingDetector:
                                         f"Car parked in slot {rec_idx + 1}. "
                                         "Slot reserved via 5s wait; next car will be directed elsewhere."
                                     )
-                                    
+
                                     # Session completion happens later when the car reaches the exit gate!
                                     # Do not clear the active session yet.
-                                    
+
                                     closest = None
                                     self._tracking_car_pos = None  # Stop tracking
                                     self._last_known_car_pos = None
                                     self._tracking_last_step = 0.0
                                     self._tracking_expected_area = None
-                                    if hasattr(self, '_slot_occupied_since'):
+                                    if hasattr(self, "_slot_occupied_since"):
                                         self._slot_occupied_since.pop(rec_idx, None)
-                                    
+
                                     # Transfer session ID if parked in a different slot than originally recommended
-                                    if self._session_active_slot_idx is not None and self._session_active_slot_idx != rec_idx:
-                                        sess_id = self._active_session_by_slot.pop(self._session_active_slot_idx, None)
+                                    if (
+                                        self._session_active_slot_idx is not None
+                                        and self._session_active_slot_idx != rec_idx
+                                    ):
+                                        sess_id = self._active_session_by_slot.pop(
+                                            self._session_active_slot_idx, None
+                                        )
                                         if sess_id:
                                             self._active_session_by_slot[rec_idx] = sess_id
-                                            
-                                    self._session_active_slot_idx = None  # CLEAR SESSION ALLOWING NEXT CAR!
+
+                                    self._session_active_slot_idx = (
+                                        None  # CLEAR SESSION ALLOWING NEXT CAR!
+                                    )
                                     # Reset guidance gate so the NEXT driver must confirm plate first
                                     self._guidance_enabled = False
                                     self._last_pending_poll = 0.0
@@ -1862,13 +1963,17 @@ class EnhancedParkingDetector:
                                         img,
                                         f"Verifying space {rec_idx + 1}: {countdown}s...",
                                         (w_img // 2 - 220, h_img // 2 + 150),
-                                        scale=1.8, thickness=2, offset=8,
+                                        scale=1.8,
+                                        thickness=2,
+                                        offset=8,
                                         colorR=(0, 120, 200),
                                     )
                             else:
                                 # Conditions not met. Tolerate up to 1.5 seconds of loss before resetting timer.
                                 if self._recommended_occupied_start is not None:
-                                    loss_time = getattr(self, '_recommended_occupied_loss_time', None)
+                                    loss_time = getattr(
+                                        self, "_recommended_occupied_loss_time", None
+                                    )
                                     if loss_time is None:
                                         self._recommended_occupied_loss_time = time.time()
                                     elif time.time() - loss_time > 1.5:
@@ -1886,7 +1991,9 @@ class EnhancedParkingDetector:
                                             img,
                                             f"Verifying space {rec_idx + 1}: {countdown}s...",
                                             (w_img // 2 - 220, h_img // 2 + 150),
-                                            scale=1.8, thickness=2, offset=8,
+                                            scale=1.8,
+                                            thickness=2,
+                                            offset=8,
                                             colorR=(0, 120, 200),
                                         )
                                 else:
@@ -1894,13 +2001,17 @@ class EnhancedParkingDetector:
                         else:
                             # Empty, or car just left, or no valid recommendation yet.
                             self._recommended_occupied_start = None
-                            
+
                             # Sticky logic: pick the best available slot OR stick to current
-                            if self._recommended_slot is not None and self._recommended_slot in empty_excl_gate and self._recommended_slot not in reserved_slots:
+                            if (
+                                self._recommended_slot is not None
+                                and self._recommended_slot in empty_excl_gate
+                                and self._recommended_slot not in reserved_slots
+                            ):
                                 closest = self._recommended_slot
                             else:
                                 closest = self.find_closest_empty_slot(gate_idx, empty_excl_gate)
-                                is_full_lot = (closest is None)
+                                is_full_lot = closest is None
                                 if closest is not None:
                                     self._recommended_slot = closest
                                     if gate_occupied and self._session_active_slot_idx is None:
@@ -1909,7 +2020,11 @@ class EnhancedParkingDetector:
 
                             # Car detected at gate with an active recommendation:
                             # create session once (start_time/is_completed=false).
-                            if gate_occupied and self._session_active_slot_idx is None and self._recommended_slot is not None:
+                            if (
+                                gate_occupied
+                                and self._session_active_slot_idx is None
+                                and self._recommended_slot is not None
+                            ):
                                 self._supabase_start_session(self._recommended_slot)
                                 self._session_active_slot_idx = self._recommended_slot
 
@@ -1918,20 +2033,32 @@ class EnhancedParkingDetector:
                     # Guidance path and GATE highlight are suppressed until the
                     # driver confirms their plate.
                     if self._guidance_enabled:
-                        self.draw_path_guidance(img, gate_idx, closest
-                                                if getattr(self, '_parked_confirm_until', None) is None
-                                                else None, is_full=is_full_lot,
-                                                moving_pos=getattr(self, '_tracking_car_pos', None))
-                    elif getattr(self, '_tracking_car_pos', None) is not None:
+                        self.draw_path_guidance(
+                            img,
+                            gate_idx,
+                            (
+                                closest
+                                if getattr(self, "_parked_confirm_until", None) is None
+                                else None
+                            ),
+                            is_full=is_full_lot,
+                            moving_pos=getattr(self, "_tracking_car_pos", None),
+                        )
+                    elif getattr(self, "_tracking_car_pos", None) is not None:
                         # Guidance not yet enabled but car is visible: draw green dot only
                         dot = self._tracking_car_pos
                         cv2.circle(img, dot, 8, (0, 255, 0), -1)
                         cv2.circle(img, dot, 14, (0, 150, 0), 2)
-                        cvzone.putTextRect(img, "Waiting for confirmation...",
-                                           (dot[0] - 80, dot[1] - 20),
-                                           scale=1.0, thickness=1, offset=4,
-                                           colorR=(30, 30, 30))
-                    
+                        cvzone.putTextRect(
+                            img,
+                            "Waiting for confirmation...",
+                            (dot[0] - 80, dot[1] - 20),
+                            scale=1.0,
+                            thickness=1,
+                            offset=4,
+                            colorR=(30, 30, 30),
+                        )
+
                     # Draw red tracking dot for exiting cars
                     for s_idx, pos in self._exiting_cars_tracking_pos.items():
                         cv2.circle(img, pos, 8, (0, 0, 255), -1)  # Red inner circle
@@ -1940,22 +2067,29 @@ class EnhancedParkingDetector:
                             img,
                             f"EXITING {s_idx + 1}",
                             (pos[0] - 30, pos[1] - 20),
-                            scale=1.2, thickness=2, offset=3,
+                            scale=1.2,
+                            thickness=2,
+                            offset=3,
                             colorR=(150, 0, 220),
                         )
 
                     # Always render the 10-second verification banner when timer is active,
                     # even if contour movement is temporarily missing.
-                    if self._recommended_occupied_start is not None and getattr(self, '_verifying_slot', self._recommended_slot) is not None:
+                    if (
+                        self._recommended_occupied_start is not None
+                        and getattr(self, "_verifying_slot", self._recommended_slot) is not None
+                    ):
                         elapsed = time.time() - self._recommended_occupied_start
                         countdown = max(0, 5 - int(elapsed))
                         h_img, w_img = img.shape[:2]
-                        v_slot = getattr(self, '_verifying_slot', self._recommended_slot)
+                        v_slot = getattr(self, "_verifying_slot", self._recommended_slot)
                         cvzone.putTextRect(
                             img,
                             f"Verifying space {v_slot + 1}: {countdown}s...",
                             (w_img // 2 - 220, h_img // 2 + 150),
-                            scale=1.8, thickness=2, offset=8,
+                            scale=1.8,
+                            thickness=2,
+                            offset=8,
                             colorR=(0, 120, 200),
                         )
 
@@ -1963,11 +2097,13 @@ class EnhancedParkingDetector:
                     if 0 <= exit_gate_idx < len(self.posList):
                         gx, gy, gw, gh = self.posList[exit_gate_idx]
                         margin = -10
-                        
+
                         # Trigger completion if visual tracked exiting car enters exit gate
                         for s_idx in list(self._exiting_cars_tracking_pos.keys()):
                             tx, ty = self._exiting_cars_tracking_pos[s_idx]
-                            if (gx + margin <= tx <= gx + gw - margin) and (gy + margin <= ty <= gy + gh - margin):
+                            if (gx + margin <= tx <= gx + gw - margin) and (
+                                gy + margin <= ty <= gy + gh - margin
+                            ):
                                 self._supabase_complete_session(s_idx)
                                 if s_idx in self._slots_waiting_exit:
                                     self._slots_waiting_exit.remove(s_idx)
@@ -2003,7 +2139,10 @@ class EnhancedParkingDetector:
 
                 # Explicit DB write confirmation banner after successful reservation.
                 if self._db_saved_banner_until is not None:
-                    if time.time() < self._db_saved_banner_until and self._recommended_slot is not None:
+                    if (
+                        time.time() < self._db_saved_banner_until
+                        and self._recommended_slot is not None
+                    ):
                         h_img, w_img = img.shape[:2]
                         cvzone.putTextRect(
                             img,
@@ -2132,9 +2271,7 @@ class EnhancedParkingDetector:
                 f"   python run.py --camera {url}\n"
             )
         else:
-            print(
-                "\n⚠️  No slots were saved. Re-run with --setup and press S to save."
-            )
+            print("\n⚠️  No slots were saved. Re-run with --setup and press S to save.")
 
     def clear_all_markings(self) -> None:
         """Clear all markings and reset to original image"""
@@ -2228,9 +2365,22 @@ class EnhancedParkingDetector:
                     bx, by, bw, bh = self.lot_boundary
                     draw_bx = bx + border_size
                     draw_by = by + border_size
-                    cv2.rectangle(bordered_img, (draw_bx, draw_by), (draw_bx + bw, draw_by + bh), (255, 0, 0), 3)
-                    cv2.putText(bordered_img, "LOT BOUNDARY", (draw_bx + 4, draw_by - 8),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+                    cv2.rectangle(
+                        bordered_img,
+                        (draw_bx, draw_by),
+                        (draw_bx + bw, draw_by + bh),
+                        (255, 0, 0),
+                        3,
+                    )
+                    cv2.putText(
+                        bordered_img,
+                        "LOT BOUNDARY",
+                        (draw_bx + 4, draw_by - 8),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        (255, 0, 0),
+                        2,
+                    )
 
                 # Draw the live selection rectangle while dragging
                 if self.drawing and self.start_point and self.end_point:
@@ -2241,7 +2391,7 @@ class EnhancedParkingDetector:
                     y1 += border_size
                     x2 += border_size
                     y2 += border_size
-                    
+
                     color = (255, 0, 0) if self.boundary_mode else (0, 255, 0)
                     cv2.rectangle(bordered_img, (x1, y1), (x2, y2), color, 2)
                     # Show live dimensions while drawing
@@ -2311,7 +2461,9 @@ class EnhancedParkingDetector:
                         bordered_img,
                         f"Boundary Mode {state}",
                         (window_width // 2 - 150, window_height - 50),
-                        scale=2, thickness=2, offset=10,
+                        scale=2,
+                        thickness=2,
+                        offset=10,
                         colorR=(255, 0, 0) if self.boundary_mode else (0, 0, 0),
                     )
                     cv2.imshow(config.WINDOW_NAME, bordered_img)
