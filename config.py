@@ -5,6 +5,13 @@ All configurable parameters are centralized here for easy management
 
 from typing import Final, List, Tuple
 
+# Backend URL
+BACKEND_URL: Final[str] = "http://localhost:8000"
+
+# MJPEG stream server (AI service serves annotated frames here)
+MJPEG_STREAM_PORT: Final[int] = 8081
+AI_STREAM_URL: Final[str] = f"http://localhost:{MJPEG_STREAM_PORT}/stream"
+
 # Parking Space Dimensions
 PARKING_WIDTH: Final[int] = 107
 PARKING_HEIGHT: Final[int] = 48

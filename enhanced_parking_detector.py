@@ -18,6 +18,7 @@ import requests
 
 import config
 from car_detector import CarDetector
+from mjpeg_server import MJPEGServer
 from setup_directories import setup_directories
 
 # Setup logging
@@ -92,6 +93,15 @@ class EnhancedParkingDetector:
         self._active_session_by_slot: Dict[int, str] = {}
         self._car_seen_in_recommended_until: Optional[float] = None
         self._session_active_slot_idx: Optional[int] = None
+        # ── Gate-confirmed guidance flag ──────────────────────────────────
+        # Guidance path + session claim are BLOCKED until the frontend
+        # creates a session (POST /start).  Toggled True by _check_pending_session().
+        self._guidance_enabled: bool = False
+        self._pending_session_checked: bool = False   # True after first successful poll
+        self._last_pending_poll: float = 0.0          # rate-limit backend polls
+        # Redirect cooldown: don't fire redirect more than once per N seconds
+        self._last_redirect_time: float = 0.0
+        self._redirect_cooldown: float = 3.0  # seconds between redirects
         self._slots_waiting_exit: set = set()
         self._exiting_cars_tracking_pos: Dict[int, Tuple[int, int]] = {}
         self._exiting_cars_loss_frames: Dict[int, int] = {}
@@ -789,6 +799,34 @@ class EnhancedParkingDetector:
                     f"Supabase layout sync failed for slot {slot_number}: {e}{error_body}"
                 )
 
+    def _check_pending_session(self) -> bool:
+        """Poll the backend once to see if the frontend created a pending session.
+        Returns True if a session with no slot_id exists (driver confirmed plate).
+        Rate-limited to one poll per 1.5 seconds.
+        """
+        import time as _time
+        now = _time.time()
+        if now - self._last_pending_poll < 1.5:
+            return self._guidance_enabled
+        self._last_pending_poll = now
+        try:
+            resp = requests.get(
+                f"{config.BACKEND_URL}/session/pending",
+                timeout=2,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("has_pending"):
+                    if not self._guidance_enabled:
+                        logger.info("Frontend session detected — guidance path enabled.")
+                    self._guidance_enabled = True
+                else:
+                    # Session was claimed or doesn't exist yet: keep current flag
+                    pass
+        except Exception:
+            pass  # Backend unreachable — keep current state
+        return self._guidance_enabled
+
     def _supabase_start_session(self, slot_idx: int) -> None:
         if not self._supabase_enabled:
             return
@@ -798,30 +836,24 @@ class EnhancedParkingDetector:
         if not slot_row:
             return
         try:
+            # Claim the session created by the frontend (driver typed their plate).
+            # We do NOT create a new session here — the frontend already did that.
             payload = {
-                "slot_id": slot_row["id"],
-                "license_plate": "UNKNOWN",
-                "start_time": self._supabase_iso_now(),
-                "is_completed": False,
+                "slot_id": str(slot_row["id"])
             }
             resp = requests.post(
-                self._supabase_table_url(config.SUPABASE_SESSIONS_TABLE),
-                headers=self._supabase_headers,
+                f"{config.BACKEND_URL}/session/claim",
                 json=payload,
                 timeout=5,
             )
             resp.raise_for_status()
-            rows = resp.json()
-            if rows and "id" in rows[0]:
-                self._active_session_by_slot[slot_idx] = rows[0]["id"]
-                logger.info(f"Supabase parking_session started for slot {slot_idx + 1}.")
+            data = resp.json()
+            
+            # Lưu lại Session ID do Backend trả về để dùng lúc xe ra
+            self._active_session_by_slot[slot_idx] = data["session_id"]
+            logger.info(f"Backend started session for slot {slot_idx + 1}. ID: {data['session_id']}")
         except Exception as e:
-            error_body = ""
-            try:
-                error_body = f" response={resp.text}"
-            except Exception:
-                pass
-            logger.error(f"Supabase start session failed for slot {slot_idx + 1}: {e}{error_body}")
+            logger.error(f"Backend auto-checkin failed for slot {slot_idx + 1}: {e}")
 
     def _supabase_complete_session(self, slot_idx: int) -> None:
         if not self._supabase_enabled:
@@ -833,26 +865,46 @@ class EnhancedParkingDetector:
             
         def _run():
             try:
+                # GỌI SANG BACKEND ĐỂ CHỐT ĐỖ XE / HOẶC HOÀN THÀNH
                 payload = {
-                    "end_time": self._supabase_iso_now(),
-                    "is_completed": True,
+                    "session_id": session_id,
+                    "selected_slot_id": None # Backend sẽ tự xử lý
                 }
-                resp = requests.patch(
-                    self._supabase_table_url(config.SUPABASE_SESSIONS_TABLE),
-                    headers=self._supabase_headers,
-                    params={"id": f"eq.{session_id}"},
+                resp = requests.post(
+                    f"{config.BACKEND_URL}/finish",
                     json=payload,
                     timeout=5,
                 )
                 resp.raise_for_status()
-                logger.info(f"Supabase parking_session completed for slot {slot_idx + 1}.")
+                logger.info(f"Backend completed session for slot {slot_idx + 1}.")
             except Exception as e:
-                error_body = ""
-                try:
-                    error_body = f" response={resp.text}"
-                except Exception:
-                    pass
-                logger.error(f"Supabase complete session failed for slot {slot_idx + 1}: {e}{error_body}")
+                logger.error(f"Backend complete session failed: {e}")
+                
+        import threading
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _supabase_redirect_session(self, session_id: str, new_slot_idx: int) -> None:
+        if not self._supabase_enabled or not session_id:
+            return
+        slot_row = self._supabase_get_slot_row(new_slot_idx)
+        if not slot_row:
+            return
+            
+        def _run():
+            try:
+                payload = {
+                    "session_id": session_id,
+                    "new_slot_id": str(slot_row["id"])
+                }
+                resp = requests.post(
+                    f"{config.BACKEND_URL}/redirect",
+                    json=payload,
+                    timeout=5,
+                )
+                resp.raise_for_status()
+                logger.info(f"Backend redirected session to slot {new_slot_idx + 1}")
+            except Exception as e:
+                logger.error(f"Backend redirect session failed: {e}")
                 
         import threading
         threading.Thread(target=_run, daemon=True).start()
@@ -1269,6 +1321,12 @@ class EnhancedParkingDetector:
                 "Check that the URL is reachable and the camera is online."
             )
 
+        # ── Start MJPEG server ─────────────────────────────────────────
+        # Serves annotated frames to the backend proxy so the browser sees
+        # the fully-overlaid feed (slots, guiding path, green dot).
+        _mjpeg = MJPEGServer(port=config.MJPEG_STREAM_PORT)
+        _mjpeg.start()
+
         bg_gray = None
         if os.path.exists("camera_reference.jpg"):
             bg_img = cv2.imread("camera_reference.jpg")
@@ -1378,9 +1436,21 @@ class EnhancedParkingDetector:
                     all_objects: List[Dict[str, Any]] = []
 
                     occupied_indices = [i for i in range(len(self.posList)) if i not in empty_indices]
+                    reserved_slots = set(self._get_reserved_slots())
+                    
+                    if not hasattr(self, '_slot_occupied_since'):
+                        self._slot_occupied_since = {}
+                    now_ts = time.time()
+                    for idx in occupied_indices:
+                        if idx not in reserved_slots:
+                            if idx not in self._slot_occupied_since:
+                                self._slot_occupied_since[idx] = now_ts
+                    for idx in list(self._slot_occupied_since.keys()):
+                        if idx not in occupied_indices or idx in reserved_slots:
+                            del self._slot_occupied_since[idx]
+                            
                     blocked_rects = []
                     recommended = getattr(self, '_recommended_slot', None)
-                    reserved_slots = set(self._get_reserved_slots())
                     
                     min_px_x = min(p[0] for p in self.posList) - 40
                     max_px_x = max(p[0] + p[2] for p in self.posList) + 40
@@ -1389,7 +1459,8 @@ class EnhancedParkingDetector:
                     
                     for idx, pos in enumerate(self.posList):
                         if idx != gate_idx and idx != recommended:
-                            if idx in occupied_indices or idx in reserved_slots:
+                            is_recently_occupied = (now_ts - self._slot_occupied_since.get(idx, 0) < 15.0)
+                            if not is_recently_occupied and (idx in occupied_indices or idx in reserved_slots):
                                 blocked_rects.append(pos)
                     
                     if thresh is not None:
@@ -1437,7 +1508,9 @@ class EnhancedParkingDetector:
                                         
                                     is_blocked = False
                                     for (brx, bry, brw, brh) in blocked_rects:
-                                        if brx <= cx <= brx + brw and bry <= cy <= bry + brh:
+                                        # Expand blocking margin to swallow shadows and bleeding pixels
+                                        bm = 30
+                                        if brx - bm <= cx <= brx + brw + bm and bry - bm <= cy <= bry + brh + bm:
                                             is_blocked = True
                                             break
                                     
@@ -1466,7 +1539,7 @@ class EnhancedParkingDetector:
                                 
                         if best_obj is not None:
                             best_cam = best_obj['cam']
-                            SMOOTH_ALPHA = 0.18
+                            SMOOTH_ALPHA = 0.45
                             self._exiting_cars_tracking_pos[s_idx] = (
                                 int(current_pos[0] * (1 - SMOOTH_ALPHA) + best_cam[0] * SMOOTH_ALPHA),
                                 int(current_pos[1] * (1 - SMOOTH_ALPHA) + best_cam[1] * SMOOTH_ALPHA),
@@ -1492,28 +1565,53 @@ class EnhancedParkingDetector:
                             # START tracking: MUST start at the contour physically nearest the gate,
                             # ignoring random large blobs in the background.
                             if gate_occupied and self._session_active_slot_idx is None:
-                                gx, gy, gw, gh = self.posList[gate_idx]
-                                gate_center = (gx + gw // 2, gy + gh // 2)
-                                closest_to_gate = min(all_objects, key=lambda o: math.dist(o['cam'], gate_center))
-                                self._tracking_car_pos = closest_to_gate['cam']
-                                self._tracking_loss_frames = 0
-                                self._tracking_expected_area = closest_to_gate['area']
+                                # Only start tracking if guidance is enabled (driver confirmed plate).
+                                if not self._guidance_enabled:
+                                    self._check_pending_session()  # will flip flag if session exists
+                                if not self._guidance_enabled:
+                                    # Still waiting — draw green dot at gate but no path
+                                    pass
+                                else:
+                                    gx, gy, gw, gh = self.posList[gate_idx]
+                                    gate_center = (gx + gw // 2, gy + gh // 2)
+                                    closest_to_gate = min(
+                                        all_objects,
+                                        key=lambda o: math.dist(o['cam'], gate_center)
+                                    )
+                                    # Expanded search radius: accept any object within
+                                    # 60 % of the frame width so we always start tracking
+                                    # even if the car isn't pixel-perfect at gate center.
+                                    h_img, w_img = img.shape[:2]
+                                    max_dist = w_img * 0.60
+                                    if math.dist(closest_to_gate['cam'], gate_center) < max_dist:
+                                        self._tracking_car_pos = closest_to_gate['cam']
+                                        self._last_known_car_pos = closest_to_gate['cam']
+                                        self._tracking_loss_frames = 0
+                                        self._tracking_expected_area = closest_to_gate['area']
                             elif self._session_active_slot_idx is not None:
-                                # RECOVER tracking mid-journey or at the destination!
-                                # If we lost visual lock, find the car closest to its destination
-                                target_idx = self._session_active_slot_idx
-                                sx, sy, sw, sh = self.posList[target_idx]
-                                target_center = (sx + sw // 2, sy + sh // 2)
-                                closest_to_target = min(all_objects, key=lambda o: math.dist(o['cam'], target_center))
-                                self._tracking_car_pos = closest_to_target['cam']
-                                self._tracking_loss_frames = 0
-                                self._tracking_expected_area = closest_to_target['area']
+                                # RECOVER tracking mid-journey.
+                                # Only use the target slot center as a fallback
+                                # if we have absolutely no last-known position.
+                                # Prefer last known car pos to avoid snapping to
+                                # the wrong slot when the car is still near the gate.
+                                if getattr(self, '_last_known_car_pos', None) is not None:
+                                    recover_center = self._last_known_car_pos
+                                    closest_to_target = min(
+                                        all_objects,
+                                        key=lambda o: math.dist(o['cam'], recover_center)
+                                    )
+                                    self._tracking_car_pos = closest_to_target['cam']
+                                    self._last_known_car_pos = closest_to_target['cam']
+                                    self._tracking_loss_frames = 0
+                                    self._tracking_expected_area = closest_to_target['area']
+                                # If no last_known position at all, leave tracking as None;
+                                # the dot will only appear once tracking re-initialises.
                         else:
                             # CONTINUOUS tracking: Find contour closest to the car's last known position
                             # rather than just the largest one. This prevents "teleporting" to shadows.
                             current_pos = self._tracking_car_pos
 
-                            dynamic_jump_px = 55 + min(35, int(self._tracking_last_step * 2.0))
+                            dynamic_jump_px = 250 + min(150, int(self._tracking_last_step * 3.0))
                             expected_area = self._tracking_expected_area
                             best_obj = None
                             best_score = float("inf")
@@ -1534,13 +1632,14 @@ class EnhancedParkingDetector:
                             if best_obj is not None:
                                 best_cam = best_obj['cam']
                                 # APPLY EMA SMOOTHING from user's algorithm
-                                SMOOTH_ALPHA = 0.18
+                                SMOOTH_ALPHA = 0.45
                                 smoothed_pos = (
                                     int(current_pos[0] * (1 - SMOOTH_ALPHA) + best_cam[0] * SMOOTH_ALPHA),
                                     int(current_pos[1] * (1 - SMOOTH_ALPHA) + best_cam[1] * SMOOTH_ALPHA),
                                 )
                                 self._tracking_last_step = math.dist(current_pos, smoothed_pos)
                                 self._tracking_car_pos = smoothed_pos
+                                self._last_known_car_pos = smoothed_pos
                                 if self._tracking_expected_area is None:
                                     self._tracking_expected_area = best_obj['area']
                                 else:
@@ -1560,14 +1659,13 @@ class EnhancedParkingDetector:
                         grace_limit = getattr(self, '_tracking_loss_frames', 0) + 1
                         self._tracking_loss_frames = grace_limit
                         # Keep guidance stable longer when a car is already being guided
-                        # or when 10s parking verification is in progress.
+                        # or when parking verification is in progress.
                         hold_limit = 25
                         if self._recommended_slot is not None:
                             hold_limit = 300
                         if self._recommended_occupied_start is not None:
                             hold_limit = 450
                         if grace_limit > hold_limit:
-                            # Nothing for ~25 frames — car has genuinely left
                             self._tracking_car_pos = None
                             self._tracking_loss_frames = 0
                             self._tracking_last_step = 0.0
@@ -1576,7 +1674,6 @@ class EnhancedParkingDetector:
                     tracking_active = getattr(self, '_tracking_car_pos', None) is not None
 
                     if not tracking_active and self._session_active_slot_idx is None:
-                        # Only clear guidance if we are NOT currently showing the confirmation banner
                         if getattr(self, '_parked_confirm_until', None) is None or time.time() > self._parked_confirm_until:
                             closest = None
                             self._recommended_slot = None
@@ -1620,32 +1717,98 @@ class EnhancedParkingDetector:
                                         self._session_active_slot_idx = closest
 
                         elif self._recommended_slot is not None and self._recommended_slot != gate_idx:
-                            rec_idx = self._recommended_slot
-                            slot_is_occupied = rec_idx not in empty_excl_gate
-                            car_in_recommended_slot = False
+                            # Find which slot the tracked car is currently in (to allow parking in ANY slot)
+                            car_in_any_slot_idx = None
                             now_ts = time.time()
-                            if self._tracking_car_pos is not None and 0 <= rec_idx < len(self.posList):
+                            if self._tracking_car_pos is not None:
                                 tx, ty = self._tracking_car_pos
-                                sx, sy, sw, sh = self.posList[rec_idx]
-                                margin = -20  # Expand acceptable area to account for camera angles & noise
-                                car_in_recommended_slot = (
-                                    sx + margin <= tx <= sx + sw - margin
-                                    and sy + margin <= ty <= sy + sh - margin
-                                )
-                                if car_in_recommended_slot:
-                                    self._car_seen_in_recommended_until = now_ts + 2.0
+                                for idx_test, (sx, sy, sw, sh) in enumerate(self.posList):
+                                    if idx_test == gate_idx or idx_test == exit_gate_idx:
+                                        continue
+                                    margin = -20  # Expand acceptable area
+                                    if (sx + margin <= tx <= sx + sw - margin
+                                        and sy + margin <= ty <= sy + sh - margin):
+                                        car_in_any_slot_idx = idx_test
+                                        break
 
-                            # Start/check confirmation only when the tracked car is inside slot
-                            # OR was seen there very recently, OR if it's our active session and it physically filled up
+                            # ── Occupancy-change fallback (works even when tracking is lost) ──
+                            # Use raw background-subtraction to detect which slot the car
+                            # parked in when the green dot tracking failed mid-journey.
+                            if car_in_any_slot_idx is None and self._guidance_enabled:
+                                newly_occupied = [
+                                    idx for idx in occupied_indices
+                                    if idx not in getattr(self, '_occupied_prev', set())
+                                    and idx != gate_idx
+                                    and idx != exit_gate_idx
+                                ]
+                                if newly_occupied:
+                                    if getattr(self, '_last_known_car_pos', None) is not None:
+                                        ref = self._last_known_car_pos
+                                        car_in_any_slot_idx = min(
+                                            newly_occupied,
+                                            key=lambda i: math.dist(
+                                                (self.posList[i][0] + self.posList[i][2] // 2,
+                                                 self.posList[i][1] + self.posList[i][3] // 2),
+                                                ref,
+                                            )
+                                        )
+                                    elif len(newly_occupied) == 1:
+                                        car_in_any_slot_idx = newly_occupied[0]
+                                    # Re-anchor the dot to the detected slot center
+                                    if car_in_any_slot_idx is not None:
+                                        sx, sy, sw, sh = self.posList[car_in_any_slot_idx]
+                                        self._tracking_car_pos = (sx + sw // 2, sy + sh // 2)
+                                        self._last_known_car_pos = self._tracking_car_pos
+
+                            if car_in_any_slot_idx is not None:
+                                self._car_seen_in_recommended_until = now_ts + 2.0
+                                self._recent_any_slot_idx = car_in_any_slot_idx
+                                # ── Driver deviated: steer recommendation to actual slot ──
+                                if car_in_any_slot_idx != self._recommended_slot:
+                                    now_rd = time.time()
+                                    if now_rd - self._last_redirect_time < self._redirect_cooldown:
+                                        pass  # Still in cooldown, skip redirect to avoid flicker
+                                    else:
+                                        self._last_redirect_time = now_rd
+                                        old = self._recommended_slot
+                                        self._recommended_slot = car_in_any_slot_idx
+                                        # Transfer any in-progress session to the new slot
+                                        if self._session_active_slot_idx == old:
+                                            sess_id = self._active_session_by_slot.pop(old, None)
+                                            if sess_id:
+                                                self._active_session_by_slot[car_in_any_slot_idx] = sess_id
+                                                self._supabase_redirect_session(sess_id, car_in_any_slot_idx)
+                                            self._session_active_slot_idx = car_in_any_slot_idx
+                                        # Reset verification timer so it starts fresh for the new slot
+                                        self._recommended_occupied_start = None
+                                        self._recommended_occupied_loss_time = None
+                                        logger.info(
+                                            f"Driver deviated: redirected recommendation "
+                                            f"from slot {old + 1} → slot {car_in_any_slot_idx + 1}"
+                                        )
+
                             recent_in_slot = (
                                 self._car_seen_in_recommended_until is not None
                                 and now_ts <= self._car_seen_in_recommended_until
                             )
                             
+                            # Decide which slot we are evaluating: always use current recommended
+                            # (which has already been updated above if driver deviated)
+                            recent_slot = getattr(self, '_recent_any_slot_idx', None)
+                            if recent_in_slot and recent_slot is not None:
+                                rec_idx = recent_slot
+                            else:
+                                rec_idx = self._recommended_slot
+
+                            slot_is_occupied = rec_idx not in empty_excl_gate
+                            car_in_eval_slot = (car_in_any_slot_idx == rec_idx)
+                            
+                            # Start/check confirmation only when the tracked car is inside the evaluated slot
+                            # OR was seen there very recently, OR if it's our active session and it physically filled up
                             condition_met = slot_is_occupied and (
-                                car_in_recommended_slot 
-                                or recent_in_slot 
-                                or self._session_active_slot_idx == rec_idx
+                                car_in_eval_slot 
+                                or (recent_in_slot and recent_slot == rec_idx)
+                                or (self._session_active_slot_idx == rec_idx)
                             )
                             
                             if condition_met:
@@ -1654,6 +1817,7 @@ class EnhancedParkingDetector:
                                 
                                 if self._recommended_occupied_start is None:
                                     self._recommended_occupied_start = time.time()
+                                    self._verifying_slot = rec_idx
 
                                 elapsed = time.time() - self._recommended_occupied_start
                                 if elapsed >= 5.0:
@@ -1672,9 +1836,22 @@ class EnhancedParkingDetector:
                                     
                                     closest = None
                                     self._tracking_car_pos = None  # Stop tracking
+                                    self._last_known_car_pos = None
                                     self._tracking_last_step = 0.0
                                     self._tracking_expected_area = None
-                                    self._session_active_slot_idx = None # CLEAR SESSION ALLOWING NEXT CAR!
+                                    if hasattr(self, '_slot_occupied_since'):
+                                        self._slot_occupied_since.pop(rec_idx, None)
+                                    
+                                    # Transfer session ID if parked in a different slot than originally recommended
+                                    if self._session_active_slot_idx is not None and self._session_active_slot_idx != rec_idx:
+                                        sess_id = self._active_session_by_slot.pop(self._session_active_slot_idx, None)
+                                        if sess_id:
+                                            self._active_session_by_slot[rec_idx] = sess_id
+                                            
+                                    self._session_active_slot_idx = None  # CLEAR SESSION ALLOWING NEXT CAR!
+                                    # Reset guidance gate so the NEXT driver must confirm plate first
+                                    self._guidance_enabled = False
+                                    self._last_pending_poll = 0.0
                                 else:
                                     # Still waiting down the 5s timer
                                     closest = rec_idx
@@ -1736,11 +1913,24 @@ class EnhancedParkingDetector:
                                 self._supabase_start_session(self._recommended_slot)
                                 self._session_active_slot_idx = self._recommended_slot
 
-                    # Call draw_path_guidance with the specific moving_pos
-                    self.draw_path_guidance(img, gate_idx, closest
-                                            if getattr(self, '_parked_confirm_until', None) is None
-                                            else None, is_full=is_full_lot,
-                                            moving_pos=getattr(self, '_tracking_car_pos', None))
+                    # ── Draw guidance path (only when guidance is enabled) ────
+                    # Green dot always drawn by draw_path_guidance via moving_pos.
+                    # Guidance path and GATE highlight are suppressed until the
+                    # driver confirms their plate.
+                    if self._guidance_enabled:
+                        self.draw_path_guidance(img, gate_idx, closest
+                                                if getattr(self, '_parked_confirm_until', None) is None
+                                                else None, is_full=is_full_lot,
+                                                moving_pos=getattr(self, '_tracking_car_pos', None))
+                    elif getattr(self, '_tracking_car_pos', None) is not None:
+                        # Guidance not yet enabled but car is visible: draw green dot only
+                        dot = self._tracking_car_pos
+                        cv2.circle(img, dot, 8, (0, 255, 0), -1)
+                        cv2.circle(img, dot, 14, (0, 150, 0), 2)
+                        cvzone.putTextRect(img, "Waiting for confirmation...",
+                                           (dot[0] - 80, dot[1] - 20),
+                                           scale=1.0, thickness=1, offset=4,
+                                           colorR=(30, 30, 30))
                     
                     # Draw red tracking dot for exiting cars
                     for s_idx, pos in self._exiting_cars_tracking_pos.items():
@@ -1756,13 +1946,14 @@ class EnhancedParkingDetector:
 
                     # Always render the 10-second verification banner when timer is active,
                     # even if contour movement is temporarily missing.
-                    if self._recommended_occupied_start is not None and self._recommended_slot is not None:
+                    if self._recommended_occupied_start is not None and getattr(self, '_verifying_slot', self._recommended_slot) is not None:
                         elapsed = time.time() - self._recommended_occupied_start
                         countdown = max(0, 5 - int(elapsed))
                         h_img, w_img = img.shape[:2]
+                        v_slot = getattr(self, '_verifying_slot', self._recommended_slot)
                         cvzone.putTextRect(
                             img,
-                            f"Verifying space {self._recommended_slot + 1}: {countdown}s...",
+                            f"Verifying space {v_slot + 1}: {countdown}s...",
                             (w_img // 2 - 220, h_img // 2 + 150),
                             scale=1.8, thickness=2, offset=8,
                             colorR=(0, 120, 200),
@@ -1860,10 +2051,15 @@ class EnhancedParkingDetector:
                     )
 
                 cv2.imshow(config.WINDOW_NAME, img)
+                # Push the fully-annotated frame to the MJPEG server so the
+                # browser frontend shows guidance overlays, not raw video.
+                _mjpeg.push_frame(img)
+                self._occupied_prev = set(occupied_indices)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
         finally:
             cap.release()
+            _mjpeg.stop()
             cv2.destroyAllWindows()
             logger.info("Camera stream processing completed")
 
@@ -2104,9 +2300,10 @@ class EnhancedParkingDetector:
                 cv2.imshow(config.WINDOW_NAME, display_img)
 
                 key = cv2.waitKey(1) & 0xFF
-                if key == ord("q"):
+                # Accept both uppercase and lowercase for all shortcuts (macOS fix)
+                if key in (ord("q"), ord("Q")):
                     break
-                elif key == ord("b"):
+                elif key in (ord("b"), ord("B")):
                     self.boundary_mode = not self.boundary_mode
                     state = "ENABLED" if self.boundary_mode else "DISABLED"
                     logger.info(f"Boundary mode {state}")
@@ -2119,11 +2316,11 @@ class EnhancedParkingDetector:
                     )
                     cv2.imshow(config.WINDOW_NAME, bordered_img)
                     cv2.waitKey(500)
-                elif key == ord("r"):
+                elif key in (ord("r"), ord("R")):
                     self.clear_all_markings()
-                elif key == ord("z"):
+                elif key in (ord("z"), ord("Z")):
                     self.undo_last_selection()
-                elif key == ord("s"):
+                elif key in (ord("s"), ord("S")):
                     self.save_parking_positions()
                     self.is_reset = False
                     cvzone.putTextRect(
