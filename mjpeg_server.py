@@ -20,11 +20,11 @@ import io
 import logging
 import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional
 
 import cv2
 import numpy as np
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 logger = logging.getLogger(__name__)
 
