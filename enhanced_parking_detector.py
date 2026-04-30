@@ -882,7 +882,7 @@ class EnhancedParkingDetector:
                     "selected_slot_id": None,  # Backend sẽ tự xử lý
                 }
                 resp = requests.post(
-                    f"{config.BACKEND_URL}/finish",
+                    f"{config.BACKEND_URL}/exit",
                     json=payload,
                     timeout=5,
                 )
@@ -1647,10 +1647,9 @@ class EnhancedParkingDetector:
                                         all_objects, key=lambda o: math.dist(o["cam"], gate_center)
                                     )
                                     # Expanded search radius: accept any object within
-                                    # 60 % of the frame width so we always start tracking
+                                    # 150 pixels of the gate center so we always start tracking
                                     # even if the car isn't pixel-perfect at gate center.
-                                    h_img, w_img = img.shape[:2]
-                                    max_dist = w_img * 0.60
+                                    max_dist = 150
                                     if math.dist(closest_to_gate["cam"], gate_center) < max_dist:
                                         self._tracking_car_pos = closest_to_gate["cam"]
                                         self._last_known_car_pos = closest_to_gate["cam"]
@@ -1668,10 +1667,11 @@ class EnhancedParkingDetector:
                                         all_objects,
                                         key=lambda o: math.dist(o["cam"], recover_center),
                                     )
-                                    self._tracking_car_pos = closest_to_target["cam"]
-                                    self._last_known_car_pos = closest_to_target["cam"]
-                                    self._tracking_loss_frames = 0
-                                    self._tracking_expected_area = closest_to_target["area"]
+                                    if math.dist(closest_to_target["cam"], recover_center) < 120:
+                                        self._tracking_car_pos = closest_to_target["cam"]
+                                        self._last_known_car_pos = closest_to_target["cam"]
+                                        self._tracking_loss_frames = 0
+                                        self._tracking_expected_area = closest_to_target["area"]
                                 # If no last_known position at all, leave tracking as None;
                                 # the dot will only appear once tracking re-initialises.
                         else:
@@ -1679,7 +1679,7 @@ class EnhancedParkingDetector:
                             # rather than just the largest one. This prevents "teleporting" to shadows.
                             current_pos = self._tracking_car_pos
 
-                            dynamic_jump_px = 250 + min(150, int(self._tracking_last_step * 3.0))
+                            dynamic_jump_px = 90 + min(60, int(self._tracking_last_step * 2.0))
                             expected_area = self._tracking_expected_area
                             best_obj = None
                             best_score = float("inf")
@@ -1830,7 +1830,7 @@ class EnhancedParkingDetector:
                                 if newly_occupied:
                                     if getattr(self, "_last_known_car_pos", None) is not None:
                                         ref = self._last_known_car_pos
-                                        car_in_any_slot_idx = min(
+                                        best_idx = min(
                                             newly_occupied,
                                             key=lambda i: math.dist(
                                                 (
@@ -1840,6 +1840,12 @@ class EnhancedParkingDetector:
                                                 ref,
                                             ),
                                         )
+                                        slot_center = (
+                                            self.posList[best_idx][0] + self.posList[best_idx][2] // 2,
+                                            self.posList[best_idx][1] + self.posList[best_idx][3] // 2,
+                                        )
+                                        if math.dist(slot_center, ref) < 250:
+                                            car_in_any_slot_idx = best_idx
                                     elif len(newly_occupied) == 1:
                                         car_in_any_slot_idx = newly_occupied[0]
                                     # Re-anchor the dot to the detected slot center
