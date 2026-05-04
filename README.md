@@ -124,7 +124,6 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 3. Run the application
-python run.py --image carParkImg.jpg
 python run.py --camera [CAMERA_URL] 
 ```
 
